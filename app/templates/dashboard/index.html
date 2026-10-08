@@ -1,0 +1,565 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Dashboard - CSCL DCR System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Welcome / Dashboard Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <div class="flex items-center space-x-2 text-xs text-slate-500 mb-1">
+        <span>Concord Pharma BI</span>
+        <span>/</span>
+        <span class="text-slate-800 font-semibold">Field Force Intelligence</span>
+      </div>
+      <h1 class="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+        <span>Daily Call Reports Dashboard</span>
+        <span class="text-xs px-2.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800">Live BI</span>
+      </h1>
+      <p class="text-sm text-slate-500 mt-0.5">
+        Real-time visibility into doctor call frequency, territory penetration, and field force productivity.
+      </p>
+    </div>
+
+    <div class="flex items-center space-x-3">
+      <a href="/dcr/form" class="inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-brand-600 hover:bg-brand-700 shadow-sm transition-all">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+        </svg>
+        New DCR Call
+      </a>
+      <a href="/dcr/list" class="inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-sm transition-all">
+        View All Logs
+      </a>
+    </div>
+  </div>
+
+  <section aria-labelledby="executive-overview-heading">
+  <h2 id="executive-overview-heading" class="text-base font-bold text-slate-900">Executive Overview</h2>
+
+  <!-- KPI Metrics Grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+    
+    <!-- Card 1: Today's Calls -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm relative overflow-hidden">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Today's Calls</span>
+        <span class="p-2 rounded-xl bg-blue-50 text-brand-600">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </span>
+      </div>
+      <div class="mt-4 flex items-baseline justify-between">
+        <div class="text-3xl font-extrabold text-slate-900">{{ metrics.total_calls_today }}</div>
+        <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Current Shift</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Logged by active representatives today</p>
+    </div>
+
+    <!-- Card 2: This Month's Calls -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm relative overflow-hidden">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Month to Date</span>
+        <span class="p-2 rounded-xl bg-purple-50 text-purple-600">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </span>
+      </div>
+      <div class="mt-4 flex items-baseline justify-between">
+        <div class="text-3xl font-extrabold text-slate-900">{{ metrics.total_calls_this_month }}</div>
+        <span class="text-xs text-slate-500 font-medium">All Time: <strong>{{ metrics.total_calls_all_time }}</strong></span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Monthly field engagements</p>
+    </div>
+
+    <!-- Card 3: Doctor Coverage Rate -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm relative overflow-hidden">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Doctor Reach</span>
+        <span class="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        </span>
+      </div>
+      <div class="mt-4 flex items-baseline justify-between">
+        <div class="text-3xl font-extrabold text-slate-900">{{ metrics.unique_doctors_covered }}</div>
+        <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">{{ metrics.coverage_rate }}% Reach</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Out of {{ metrics.total_doctors_master }} doctors on master file</p>
+    </div>
+
+    <!-- Card 4: Active Marketers & Zones -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm relative overflow-hidden">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Field Force</span>
+        <span class="p-2 rounded-xl bg-amber-50 text-amber-600">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        </span>
+      </div>
+      <div class="mt-4 flex items-baseline justify-between">
+        <div class="text-3xl font-extrabold text-slate-900">{{ metrics.active_marketers }}</div>
+        <span class="text-xs text-slate-500 font-medium">{{ metrics.total_territories }} Territories</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Representatives reporting visits</p>
+    </div>
+
+  </div>
+  </section>
+
+  <!-- Middle Row: Territory Breakdown & 7-Day Trend -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Territory Call Counts Breakdown (2 Columns) -->
+    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">DCR Call Volume by Territory</h2>
+          <p class="text-xs text-slate-500">Distribution of doctor calls across mapped sales zones</p>
+        </div>
+        <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700">
+          {{ territory_breakdown|length }} Zones
+        </span>
+      </div>
+
+      <div class="space-y-4">
+        {% if territory_breakdown %}
+          {% for t in territory_breakdown %}
+          <div class="p-3 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/50 transition-all">
+            <div class="flex items-center justify-between text-xs mb-1.5">
+              <div class="flex items-center space-x-2">
+                <span class="font-mono font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">{{ t.code }}</span>
+                <span class="font-semibold text-slate-800 text-sm">{{ t.name }}</span>
+                <span class="text-slate-400">({{ t.region }})</span>
+              </div>
+              <div class="text-right">
+                <span class="font-bold text-slate-900">{{ t.call_count }} Calls</span>
+                <span class="text-slate-400 ml-1">({{ t.percentage }}%)</span>
+              </div>
+            </div>
+            
+            <!-- Progress bar -->
+            <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div class="bg-brand-600 h-2 rounded-full transition-all duration-500" style="width: {{ t.percentage }}%;"></div>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-sm text-slate-400 py-6 text-center">No territory call data available yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 7-Day Trend Chart Column (1 Column) -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-base font-bold text-slate-900">7-Day Call Trend</h2>
+          <span class="text-xs font-semibold text-brand-600">Daily Activity</span>
+        </div>
+        <p class="text-xs text-slate-500 mb-6">Call volume consistency over past week</p>
+      </div>
+
+      <!-- CSS Bar Chart -->
+      <div class="h-48 flex items-end justify-between gap-2 pt-6 pb-2 border-b border-slate-100">
+        {% for day in daily_trend %}
+        {% set height_percent = (day.count / max_trend_count * 100) if max_trend_count > 0 else 5 %}
+        <div class="flex-1 flex flex-col items-center group relative">
+          <!-- Tooltip on hover -->
+          <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-slate-800 text-white text-[10px] py-1 px-1.5 rounded whitespace-nowrap z-10 pointer-events-none">
+            {{ day.count }} calls on {{ day.date }}
+          </div>
+          
+          <div class="w-full bg-brand-50 rounded-t-lg flex items-end justify-center" style="height: 100%;">
+            <div class="w-full bg-brand-600 rounded-t-lg transition-all duration-500 group-hover:bg-brand-700" style="height: {{ [height_percent, 8]|max }}%;"></div>
+          </div>
+          <span class="text-[10px] font-semibold text-slate-500 mt-2">{{ day.date }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Visit Type Distribution Mini Widget -->
+      <div class="mt-6 pt-4 border-t border-slate-100">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Call Categories</h3>
+        <div class="space-y-2 text-xs">
+          {% for vt in visit_type_breakdown %}
+          <div class="flex items-center justify-between">
+            <span class="text-slate-600 font-medium">{{ vt.visit_type }}</span>
+            <span class="font-bold text-slate-800">{{ vt.call_count }} <span class="text-slate-400 font-normal">({{ vt.percentage }}%)</span></span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Referral, indication, and product demand analytics -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <section class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="flex items-start justify-between gap-3 mb-5">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">Referral Funnel</h2>
+          <p class="text-xs text-slate-500 mt-1">Opportunities and estimated therapy candidates</p>
+        </div>
+        <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold">
+          {{ referral_funnel.total_opportunities }} opportunities
+        </span>
+      </div>
+      <div class="space-y-4">
+        {% for status in referral_funnel.statuses %}
+        <div>
+          <div class="flex items-center justify-between text-xs mb-1.5">
+            <span class="font-semibold text-slate-700">{{ status.status }}</span>
+            <span class="font-bold text-slate-900">{{ status.opportunity_count }}
+              <span class="font-normal text-slate-500">· {{ status.candidate_count }} candidates</span>
+            </span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+            {% set referral_width = status.opportunity_count / max_referral_count * 100 %}
+            <div class="bg-emerald-500 h-2 rounded-full" style="width: {{ referral_width }}%;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+        <span class="font-semibold text-slate-500">Total estimated candidates</span>
+        <strong class="text-slate-900">{{ referral_funnel.estimated_candidates }}</strong>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="mb-5">
+        <h2 class="text-base font-bold text-slate-900">Indication & Therapy</h2>
+        <p class="text-xs text-slate-500 mt-1">Calls, referrals, and estimated candidates by indication</p>
+      </div>
+      {% if indication_breakdown %}
+      <div class="space-y-4">
+        {% for item in indication_breakdown %}
+        <div>
+          <div class="flex items-start justify-between gap-2 text-xs mb-1.5">
+            <span class="font-semibold text-slate-700">{{ item.indication }}</span>
+            <span class="text-right whitespace-nowrap">
+              <strong class="text-slate-900">{{ item.call_count }} calls</strong>
+              <span class="text-slate-500">· {{ item.candidate_count }} candidates</span>
+            </span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+            {% set indication_width = item.call_count / max_indication_count * 100 %}
+            <div class="bg-blue-500 h-2 rounded-full" style="width: {{ indication_width }}%;"></div>
+          </div>
+          <div class="text-[10px] text-slate-400 mt-1">{{ item.referral_count }} referral opportunities · {{ item.percentage }}% of calls</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="py-8 text-center text-sm text-slate-400">No indication data has been recorded yet.</p>
+      {% endif %}
+    </section>
+
+    <section class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="mb-5">
+        <h2 class="text-base font-bold text-slate-900">Products & Therapies in Demand</h2>
+        <p class="text-xs text-slate-500 mt-1">Mentions from product names entered in call reports</p>
+      </div>
+      {% if product_demand %}
+      <div class="space-y-4">
+        {% for item in product_demand %}
+        <div>
+          <div class="flex items-center justify-between text-xs mb-1.5">
+            <span class="font-semibold text-slate-700">{{ item.product }}</span>
+            <span class="font-bold text-slate-900">{{ item.call_count }}</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+            {% set product_width = item.call_count / max_product_count * 100 %}
+            <div class="bg-purple-500 h-2 rounded-full" style="width: {{ product_width }}%;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="py-8 text-center text-sm text-slate-400">No product mentions have been recorded yet.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- Marketer scorecard and doctor coverage -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-200">
+        <h2 class="text-base font-bold text-slate-900">Marketer Scorecard</h2>
+        <p class="text-xs text-slate-500 mt-1">Month-to-date calls, doctor reach, referrals, and candidate estimates</p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+          <thead class="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+            <tr>
+              <th class="py-3 px-4">Marketer</th>
+              <th class="py-3 px-4 text-right">Calls</th>
+              <th class="py-3 px-4 text-right">Doctors</th>
+              <th class="py-3 px-4 text-right">Referrals</th>
+              <th class="py-3 px-4 text-right">Candidates</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 text-slate-700">
+            {% for marketer in marketer_scorecard %}
+            <tr class="hover:bg-slate-50/70">
+              <td class="py-3 px-4 font-semibold text-slate-900">{{ marketer.marketer_name }}</td>
+              <td class="py-3 px-4 text-right font-bold">{{ marketer.call_count }}</td>
+              <td class="py-3 px-4 text-right">{{ marketer.doctors_visited }}</td>
+              <td class="py-3 px-4 text-right">{{ marketer.referral_opportunities }}</td>
+              <td class="py-3 px-4 text-right">{{ marketer.estimated_candidates }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="py-8 text-center text-slate-400">No active marketer accounts found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-200">
+        <h2 class="text-base font-bold text-slate-900">Doctor Coverage</h2>
+        <p class="text-xs text-slate-500 mt-1">Distinct doctors visited this month compared with the territory roster</p>
+      </div>
+      <div class="divide-y divide-slate-100">
+        {% for territory in doctor_coverage %}
+        <div class="px-6 py-4">
+          <div class="flex items-center justify-between gap-3 text-xs mb-2">
+            <span class="font-semibold text-slate-800">{{ territory.territory_name }}</span>
+            <span class="whitespace-nowrap text-slate-600">
+              <strong class="text-slate-900">{{ territory.visited_doctors }}</strong> / {{ territory.total_doctors }}
+              <strong class="ml-1 text-brand-700">{{ territory.coverage_percentage }}%</strong>
+            </span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+            <div class="bg-brand-600 h-2 rounded-full" style="width: {{ territory.coverage_percentage }}%;"></div>
+          </div>
+        </div>
+        {% else %}
+        <p class="py-8 text-center text-sm text-slate-400">No territory doctor rosters are available.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <!-- Territory performance matrix -->
+  <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-200">
+      <h2 class="text-base font-bold text-slate-900">Territory Yield</h2>
+      <p class="text-xs text-slate-500 mt-1">Month-to-date visits, productive outcomes, referral opportunities, and estimated candidates</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+        <thead class="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+          <tr>
+            <th class="py-3 px-4">Territory</th>
+            <th class="py-3 px-4 text-right">Calls</th>
+            <th class="py-3 px-4 text-right">Productive</th>
+            <th class="py-3 px-4 text-right">Productive Rate</th>
+            <th class="py-3 px-4 text-right">Referral Opps</th>
+            <th class="py-3 px-4 text-right">Est. Candidates</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-slate-700">
+          {% for territory in territory_performance %}
+          <tr class="hover:bg-slate-50/70">
+            <td class="py-3 px-4">
+              <div class="font-semibold text-slate-900">{{ territory.territory_name }}</div>
+              <div class="text-[10px] text-slate-400 font-mono">{{ territory.territory_code }}</div>
+            </td>
+            <td class="py-3 px-4 text-right font-bold text-slate-900">{{ territory.call_count }}</td>
+            <td class="py-3 px-4 text-right">{{ territory.productive_count }}</td>
+            <td class="py-3 px-4 text-right">{{ territory.productive_rate }}%</td>
+            <td class="py-3 px-4 text-right">{{ territory.referral_count }}</td>
+            <td class="py-3 px-4 text-right">{{ territory.candidate_count }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="py-8 text-center text-slate-400">No territory performance data available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Follow-up control -->
+  <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <h2 class="text-base font-bold text-slate-900">Follow-up Control</h2>
+        <p class="text-xs text-slate-500 mt-1">Open follow-ups are ordered by due date; completing one removes it from this queue.</p>
+      </div>
+      <div class="flex flex-wrap gap-2 text-xs font-bold">
+        <span class="px-2.5 py-1 rounded-lg bg-red-50 text-red-700">{{ follow_up_control.overdue_count }} overdue</span>
+        <span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700">{{ follow_up_control.due_today_count }} due today</span>
+        <span class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700">{{ follow_up_control.upcoming_count }} upcoming</span>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+        <thead class="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+          <tr>
+            <th class="py-3 px-4">Due</th>
+            <th class="py-3 px-4">Doctor / Territory</th>
+            <th class="py-3 px-4">Representative</th>
+            <th class="py-3 px-4">Next Action</th>
+            <th class="py-3 px-4 text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-slate-700">
+          {% for task in follow_up_control.tasks %}
+          <tr class="hover:bg-slate-50/70">
+            <td class="py-3 px-4 whitespace-nowrap">
+              <div class="font-semibold text-slate-900">{{ task.followup_date }}</div>
+              <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase
+                {% if task.due_status == 'Overdue' %}bg-red-100 text-red-700{% elif task.due_status == 'Due today' %}bg-amber-100 text-amber-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                {% if task.due_status == 'Overdue' %}{{ task.days_overdue }} days overdue{% else %}{{ task.due_status }}{% endif %}
+              </span>
+            </td>
+            <td class="py-3 px-4">
+              <div class="font-semibold text-slate-900">{{ task.doctor_name }}</div>
+              <div class="text-[11px] text-slate-500">{{ task.territory_name }} · {{ task.dcr_number }}</div>
+            </td>
+            <td class="py-3 px-4">{{ task.marketer_name }}</td>
+            <td class="py-3 px-4 max-w-sm">{{ task.next_action or 'Follow up with doctor' }}</td>
+            <td class="py-3 px-4 text-right whitespace-nowrap">
+              <form
+                hx-post="/dcr/{{ task.dcr_id }}/follow-up/complete"
+                hx-target="closest tr"
+                hx-swap="outerHTML"
+                hx-confirm="Mark this follow-up complete?"
+              >
+                <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold">
+                  Mark complete
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="py-8 text-center text-slate-400">No open follow-ups. New scheduled calls will appear here.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Market intelligence -->
+  <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-200 flex flex-col gap-4">
+      <div>
+        <h2 class="text-base font-bold text-slate-900">Market Intelligence</h2>
+        <p class="text-xs text-slate-500 mt-1">Recent competitor notes, commercial concerns, and clinical questions recorded in DCRs</p>
+      </div>
+      <div class="flex flex-wrap gap-2 text-xs font-semibold">
+        <span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700">{{ market_intelligence.reported_entries }} reports</span>
+        <span class="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700">{{ market_intelligence.competitor_mentions }} competitor notes</span>
+        <span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700">{{ market_intelligence.commercial_concerns }} commercial concerns</span>
+        <span class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700">{{ market_intelligence.doctor_questions }} doctor questions</span>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+        <thead class="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+          <tr>
+            <th class="py-3 px-4">Report / Field Context</th>
+            <th class="py-3 px-4">Competitor Intelligence</th>
+            <th class="py-3 px-4">Commercial Concern</th>
+            <th class="py-3 px-4">Doctor Question</th>
+            <th class="py-3 px-4">Next Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-slate-700">
+          {% for item in market_intelligence.observations %}
+          <tr class="align-top hover:bg-slate-50/70">
+            <td class="py-3 px-4 whitespace-nowrap">
+              <div class="font-semibold text-slate-900">{{ item.doctor_name }}</div>
+              <div class="text-[11px] text-slate-500">{{ item.territory_name }} · {{ item.report_date }}</div>
+              <div class="text-[10px] text-slate-400">{{ item.marketer_name }} · {{ item.dcr_number }}</div>
+            </td>
+            <td class="py-3 px-4 min-w-48">{{ item.competitor_intelligence or '-' }}</td>
+            <td class="py-3 px-4 min-w-48">{{ item.commercial_concern or '-' }}</td>
+            <td class="py-3 px-4 min-w-48">{{ item.doctor_question or '-' }}</td>
+            <td class="py-3 px-4 min-w-40">{{ item.next_action or '-' }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="py-8 text-center text-slate-400">No market-intelligence notes have been recorded yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Bottom Row: Top Visited Doctors Leaderboard -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+      <div>
+        <h2 class="text-base font-bold text-slate-900">Doctor Interaction Frequency Leaderboard</h2>
+        <p class="text-xs text-slate-500">Key opinion leaders and high-engagement prescribers</p>
+      </div>
+      <a href="/dcr/list" class="text-xs font-bold text-brand-600 hover:text-brand-700">View Full Reports &rarr;</a>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+        <thead class="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+          <tr>
+            <th class="py-3 px-4">Doctor Name</th>
+            <th class="py-3 px-4">Specialty</th>
+            <th class="py-3 px-4">Hospital / Chamber</th>
+            <th class="py-3 px-4">Territory</th>
+            <th class="py-3 px-4 text-center">Total Visits</th>
+            <th class="py-3 px-4 text-right">Last Interaction</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-slate-700">
+          {% if doctor_frequency %}
+            {% for doc in doctor_frequency %}
+            <tr class="hover:bg-slate-50/70 transition-colors">
+              <td class="py-3 px-4 font-bold text-slate-900">
+                {{ doc.doctor_name }}
+              </td>
+              <td class="py-3 px-4 text-slate-600">
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700">
+                  {{ doc.specialty }}
+                </span>
+              </td>
+              <td class="py-3 px-4 text-slate-600">
+                {{ doc.hospital_name }}
+              </td>
+              <td class="py-3 px-4 text-slate-600">
+                {{ doc.territory_name }}
+              </td>
+              <td class="py-3 px-4 text-center">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-100 text-purple-800">
+                  {{ doc.visit_count }} Calls
+                </span>
+              </td>
+              <td class="py-3 px-4 text-right font-medium text-slate-500">
+                {{ doc.last_visit_date }}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6" class="py-8 text-center text-slate-400">
+                No doctor interactions recorded yet. Submit DCR calls to view frequency analytics.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

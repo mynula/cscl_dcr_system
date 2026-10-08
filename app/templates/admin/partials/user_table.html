@@ -1,0 +1,36 @@
+<table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+  <thead class="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+    <tr>
+      <th class="py-3 px-4">User</th>
+      <th class="py-3 px-4">Role</th>
+      <th class="py-3 px-4">Territory</th>
+      <th class="py-3 px-4">Status</th>
+    </tr>
+  </thead>
+  <tbody class="divide-y divide-slate-100 text-slate-700">
+    {% for account in users %}
+    <tr class="hover:bg-slate-50 transition-colors">
+      <td class="py-3 px-4">
+        <div class="font-semibold text-slate-900">{{ account.full_name }}</div>
+        <div class="text-[11px] text-slate-500">{{ account.username }} · {{ account.email }}</div>
+      </td>
+      <td class="py-3 px-4">
+        <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase
+          {% if account.role == 'admin' %}bg-purple-100 text-purple-700{% elif account.role == 'manager' %}bg-amber-100 text-amber-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+          {{ account.role }}
+        </span>
+      </td>
+      <td class="py-3 px-4 text-slate-600">{{ account.territory.name if account.territory else 'Unassigned' }}</td>
+      <td class="py-3 px-4">
+        <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase {% if account.is_active %}bg-emerald-100 text-emerald-700{% else %}bg-slate-100 text-slate-500{% endif %}">
+          {{ 'Active' if account.is_active else 'Inactive' }}
+        </span>
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="4" class="py-8 text-center text-slate-400">No user accounts found.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
