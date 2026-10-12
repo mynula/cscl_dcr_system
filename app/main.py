@@ -18,6 +18,7 @@ from app.routers.auth import router as auth_router
 from app.routers.dcr import router as dcr_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.admin import router as admin_router
+from app.routers.tour_plan import router as tour_plan_router
 
 # Configure logging
 logging.basicConfig(
@@ -68,6 +69,7 @@ app.include_router(auth_router)
 app.include_router(dcr_router)
 app.include_router(dashboard_router)
 app.include_router(admin_router)
+app.include_router(tour_plan_router)
 
 
 @app.get("/")

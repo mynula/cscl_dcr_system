@@ -1,5 +1,7 @@
 import unittest
 import os
+import io
+import json
 from html import unescape
 from datetime import date, timedelta
 from unittest.mock import patch
@@ -14,9 +16,17 @@ from app.main import app
 from app.models.user import User
 from app.models.master import Territory, Hospital, Doctor, VisitType
 from app.models.dcr import FactDCR
+from app.models.tour_plan import (
+    TourPlan,
+    TourPlanAudit,
+    TourPlanImport,
+    TourPlanSetting,
+    TourPlanVisit,
+)
 from app.services.auth_service import get_password_hash, create_access_token, verify_password
 from app.services.seed_data import seed_database_defaults
 from app.services.analytics_service import get_dashboard_summary_metrics, get_calls_by_territory
+from openpyxl import Workbook
 
 from sqlalchemy.pool import StaticPool
 
@@ -573,6 +583,501 @@ class TestCSCLDCRSystem(unittest.TestCase):
             follow_redirects=False,
         )
         self.assertEqual(new_login.status_code, 302)
+
+    def test_14_tour_plan_permissions_review_publish_and_dcr_linkage(self):
+        client.cookies.clear()
+        with TestingSessionLocal() as db:
+            marketer = db.query(User).filter(User.username == "marketer1").first()
+            territory = db.query(Territory).filter(Territory.id == marketer.territory_id).first()
+            doctors = db.query(Doctor).filter(Doctor.territory_id == territory.id).order_by(Doctor.id).limit(2).all()
+            visit_type = db.query(VisitType).filter(VisitType.is_active.is_(True)).first()
+            other_marketer = User(
+                username="tour_plan_other_marketer",
+                email="tour-plan-other@example.test",
+                hashed_password=get_password_hash("tour-plan-password"),
+                full_name="Other Tour Plan Marketer",
+                role="marketer",
+                territory_id=territory.id,
+                is_active=True,
+            )
+            db.add(other_marketer)
+            unassigned_marketer = User(
+                username="tour_plan_unassigned_marketer",
+                email="tour-plan-unassigned@example.test",
+                hashed_password=get_password_hash("tour-plan-password"),
+                full_name="Unassigned Tour Plan Marketer",
+                role="marketer",
+                is_active=True,
+            )
+            db.add(unassigned_marketer)
+            db.commit()
+            marketer_id = marketer.id
+            other_marketer_id = other_marketer.id
+            territory_id = territory.id
+            doctor_id = doctors[0].id
+            second_doctor_id = doctors[1].id
+            visit_type_id = visit_type.id
+            hospital_id = doctors[0].hospital_id
+            second_hospital_id = doctors[1].hospital_id
+
+        today = date.today()
+        period_start = today - timedelta(days=today.weekday())
+        period_end = period_start + timedelta(days=6)
+        rows = [
+            {
+                "planned_date": today.isoformat(),
+                "sequence": 1,
+                "doctor_id": doctor_id,
+                "visit_type_id": visit_type_id,
+                "planned_products": "StemPro-X",
+                "planned_indication": "Orthopedic / Osteoarthritis",
+                "notes": "Discuss evidence",
+            },
+            {
+                "planned_date": today.isoformat(),
+                "sequence": 2,
+                "doctor_id": second_doctor_id,
+                "visit_type_id": visit_type_id,
+                "planned_products": "StemPro-Y",
+                "planned_indication": "Orthopedic",
+                "notes": "Automatic matching visit",
+            },
+        ]
+        admin_login = client.post(
+            "/auth/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        self.assertEqual(admin_login.status_code, 302)
+        initial_setting = client.get("/tour-plan")
+        self.assertEqual(initial_setting.status_code, 200)
+        with TestingSessionLocal() as db:
+            setting = db.query(TourPlanSetting).filter(TourPlanSetting.id == 1).first()
+            self.assertIsNotNone(setting)
+            self.assertFalse(setting.marketer_self_service)
+
+        client.get("/auth/logout")
+        client.post(
+            "/auth/login",
+            data={"username": "marketer1", "password": "marketer123"},
+            follow_redirects=False,
+        )
+        self.assertEqual(client.get("/tour-plan/new").status_code, 403)
+        self.assertEqual(
+            client.post(
+                "/tour-plan/settings",
+                data={"marketer_self_service": "true"},
+            ).status_code,
+            403,
+        )
+
+        client.get("/auth/logout")
+        client.post(
+            "/auth/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        self.assertEqual(
+            client.post(
+                "/tour-plan/settings",
+                data={"marketer_self_service": "true"},
+                follow_redirects=False,
+            ).status_code,
+            303,
+        )
+        client.get("/auth/logout")
+        client.post(
+            "/auth/login",
+            data={
+                "username": "tour_plan_unassigned_marketer",
+                "password": "tour-plan-password",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(client.get("/tour-plan/new").status_code, 403)
+        client.get("/auth/logout")
+        client.post(
+            "/auth/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        create_plan_response = client.post(
+            "/tour-plan",
+            data={
+                "title": "Weekly DCR Integration Test",
+                "period_type": "weekly",
+                "period_start": period_start.isoformat(),
+                "period_end": period_end.isoformat(),
+                "territory_id": territory_id,
+                "marketer_id": marketer_id,
+                "visits_json": json.dumps(rows),
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(create_plan_response.status_code, 303, create_plan_response.text)
+        plan_id = int(create_plan_response.headers["location"].rsplit("/", 1)[1])
+
+        other_rows = [{**rows[0], "planned_products": "Other marketer plan"}]
+        other_plan_response = client.post(
+            "/tour-plan",
+            data={
+                "title": "Other Marketer Plan",
+                "period_type": "weekly",
+                "period_start": period_start.isoformat(),
+                "period_end": period_end.isoformat(),
+                "territory_id": territory_id,
+                "marketer_id": other_marketer_id,
+                "visits_json": json.dumps(other_rows),
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(other_plan_response.status_code, 303, other_plan_response.text)
+        other_plan_id = int(other_plan_response.headers["location"].rsplit("/", 1)[1])
+        competing_plan_response = client.post(
+            "/tour-plan",
+            data={
+                "title": "Competing same-day visit",
+                "period_type": "weekly",
+                "period_start": period_start.isoformat(),
+                "period_end": period_end.isoformat(),
+                "territory_id": territory_id,
+                "marketer_id": marketer_id,
+                "visits_json": json.dumps([other_rows[0]]),
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(competing_plan_response.status_code, 303, competing_plan_response.text)
+        competing_plan_id = int(competing_plan_response.headers["location"].rsplit("/", 1)[1])
+
+        client.get("/auth/logout")
+        client.post(
+            "/auth/login",
+            data={"username": "marketer1", "password": "marketer123"},
+            follow_redirects=False,
+        )
+        self.assertEqual(client.get(f"/tour-plan/{plan_id}").status_code, 200)
+        self.assertEqual(client.get(f"/tour-plan/{other_plan_id}").status_code, 404)
+        self.assertEqual(
+            client.post(f"/tour-plan/{plan_id}/submit", follow_redirects=False).status_code,
+            303,
+        )
+        self.assertEqual(
+            client.post(f"/tour-plan/{competing_plan_id}/submit", follow_redirects=False).status_code,
+            303,
+        )
+
+        client.get("/auth/logout")
+        client.post(
+            "/auth/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        self.assertEqual(
+            client.post(f"/tour-plan/{plan_id}/approve", follow_redirects=False).status_code,
+            303,
+        )
+        self.assertEqual(
+            client.post(f"/tour-plan/{plan_id}/publish", follow_redirects=False).status_code,
+            303,
+        )
+        self.assertEqual(
+            client.post(f"/tour-plan/{competing_plan_id}/approve", follow_redirects=False).status_code,
+            303,
+        )
+        self.assertEqual(
+            client.post(f"/tour-plan/{competing_plan_id}/publish", follow_redirects=False).status_code,
+            303,
+        )
+
+        client.get("/auth/logout")
+        client.post(
+            "/auth/login",
+            data={"username": "marketer1", "password": "marketer123"},
+            follow_redirects=False,
+        )
+        with TestingSessionLocal() as db:
+            plan = db.query(TourPlan).filter(TourPlan.id == plan_id).first()
+            visit_id = next(visit.id for visit in plan.visits if visit.doctor_id == doctor_id)
+            second_visit_id = next(visit.id for visit in plan.visits if visit.doctor_id == second_doctor_id)
+            competing_visit_id = next(
+                visit.id
+                for visit in db.query(TourPlanVisit).join(TourPlan).filter(
+                    TourPlan.id == competing_plan_id
+                ).all()
+            )
+        prefilled_form = client.get(f"/dcr/form?planned_visit_id={visit_id}")
+        self.assertEqual(prefilled_form.status_code, 200, prefilled_form.text)
+        self.assertIn(f'value="{visit_id}" selected', prefilled_form.text)
+        self.assertIn(f'value="{doctor_id}" selected', prefilled_form.text)
+        self.assertIn(f'value="{visit_type_id}" selected', prefilled_form.text)
+        self.assertIn(f'value="{today.isoformat()}"', prefilled_form.text)
+        options = client.get(
+            f"/tour-plan/visits/options?report_date={today.isoformat()}&doctor_id={doctor_id}"
+        )
+        self.assertEqual(options.status_code, 200)
+        self.assertIn(f"value='{visit_id}'", options.text)
+        self.assertIn(f"value='{competing_visit_id}'", options.text)
+        ambiguous_call = client.post(
+            "/dcr/",
+            data={
+                "report_date": today.isoformat(),
+                "territory_id": territory_id,
+                "hospital_id": hospital_id or "",
+                "doctor_id": doctor_id,
+                "visit_type_id": visit_type_id,
+                "products_discussed": "Unplanned actual product",
+            },
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(ambiguous_call.status_code, 200, ambiguous_call.text)
+        self.assertIn("Unplanned call", ambiguous_call.text)
+        dcr_response = client.post(
+            "/dcr/",
+            data={
+                "report_date": today.isoformat(),
+                "territory_id": territory_id,
+                "hospital_id": hospital_id or "",
+                "doctor_id": doctor_id,
+                "visit_type_id": visit_type_id,
+                "products_discussed": "Different actual product",
+                "primary_indication": "Different actual indication",
+                "planned_visit_id": visit_id,
+            },
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(dcr_response.status_code, 200, dcr_response.text)
+        self.assertIn("submission-success-banner", dcr_response.text)
+        self.assertIn("Weekly DCR Integration Test", dcr_response.text)
+        auto_matched_call = client.post(
+            "/dcr/",
+            data={
+                "report_date": today.isoformat(),
+                "territory_id": territory_id,
+                "hospital_id": second_hospital_id or "",
+                "doctor_id": second_doctor_id,
+                "visit_type_id": visit_type_id,
+                "products_discussed": "StemPro-Y",
+                "primary_indication": "Orthopedic",
+            },
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(auto_matched_call.status_code, 200, auto_matched_call.text)
+        self.assertIn("Weekly DCR Integration Test", auto_matched_call.text)
+        with TestingSessionLocal() as db:
+            visit = db.query(TourPlanVisit).filter(TourPlanVisit.id == visit_id).first()
+            self.assertEqual(visit.status, "Completed")
+            self.assertIsNotNone(visit.actual_dcr_id)
+            automatically_matched_visit = db.query(TourPlanVisit).filter(
+                TourPlanVisit.id == second_visit_id
+            ).first()
+            self.assertEqual(automatically_matched_visit.status, "Completed")
+            self.assertIsNotNone(automatically_matched_visit.actual_dcr_id)
+            self.assertEqual(
+                db.query(TourPlan).filter(TourPlan.id == plan_id).first().status,
+                "Published",
+            )
+            actions = {
+                audit.action
+                for audit in db.query(TourPlanAudit).filter(TourPlanAudit.plan_id == plan_id)
+            }
+            self.assertTrue({"created", "submitted", "approve", "publish", "visit_completed"} <= actions)
+        report = client.get("/tour-plan/report")
+        self.assertEqual(report.status_code, 200)
+        self.assertIn("product/therapy", report.text)
+        self.assertIn("1", report.text)
+
+    def test_15_tour_plan_rejects_duplicate_daily_sequence_and_preserves_form(self):
+        client.cookies.clear()
+        client.post(
+            "/auth/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        with TestingSessionLocal() as db:
+            marketer = db.query(User).filter(User.username == "marketer1").first()
+            territory_id = marketer.territory_id
+            doctors = db.query(Doctor).filter(Doctor.territory_id == territory_id).limit(2).all()
+            visit_type_id = db.query(VisitType).filter(VisitType.is_active.is_(True)).first().id
+        self.assertGreaterEqual(len(doctors), 2)
+        today = date.today()
+        start = today - timedelta(days=today.weekday())
+        rows = [
+            {
+                "planned_date": today.isoformat(),
+                "sequence": 1,
+                "doctor_id": doctor.id,
+                "visit_type_id": visit_type_id,
+            }
+            for doctor in doctors
+        ]
+        response = client.post(
+            "/tour-plan",
+            data={
+                "title": "Duplicate sequence should remain visible",
+                "period_type": "weekly",
+                "period_start": start.isoformat(),
+                "period_end": (start + timedelta(days=6)).isoformat(),
+                "territory_id": territory_id,
+                "marketer_id": marketer.id,
+                "visits_json": json.dumps(rows),
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("sequence numbers must be unique", response.text)
+        self.assertIn("Duplicate sequence should remain visible", response.text)
+        self.assertIn(doctors[0].name, response.text)
+        malformed_rows = client.post(
+            "/tour-plan",
+            data={
+                "title": "Malformed visit payload",
+                "period_type": "weekly",
+                "period_start": start.isoformat(),
+                "period_end": (start + timedelta(days=6)).isoformat(),
+                "territory_id": territory_id,
+                "marketer_id": marketer.id,
+                "visits_json": json.dumps(["not an object"]),
+            },
+        )
+        self.assertEqual(malformed_rows.status_code, 400)
+        self.assertIn("expected a visit object", malformed_rows.text)
+
+    def test_16_tour_plan_csv_and_xlsx_import_preview_and_confirm(self):
+        client.cookies.clear()
+        client.post(
+            "/auth/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        with TestingSessionLocal() as db:
+            marketer = db.query(User).filter(User.username == "marketer1").first()
+            territory_id = marketer.territory_id
+            doctor = db.query(Doctor).filter(Doctor.territory_id == territory_id).first()
+            visit_type_id = db.query(VisitType).filter(VisitType.is_active.is_(True)).first().id
+        today = date.today()
+        start = today - timedelta(days=today.weekday())
+        form = {
+            "title": "CSV imported plan",
+            "period_type": "weekly",
+            "period_start": start.isoformat(),
+            "period_end": (start + timedelta(days=6)).isoformat(),
+            "territory_id": str(territory_id),
+            "marketer_id": str(marketer.id),
+        }
+        csv_content = (
+            "planned_date,sequence,doctor_id,visit_type_id,planned_products,planned_indication,notes\n"
+            f"{today.isoformat()},1,{doctor.id},{visit_type_id},StemPro-X,Orthopedic,Imported visit\n"
+            f"{today.isoformat()},2,999999,{visit_type_id},,,Unknown doctor\n"
+        )
+        preview = client.post(
+            "/tour-plan/import/preview",
+            data=form,
+            files={"upload": ("tour-plan.csv", csv_content, "text/csv")},
+        )
+        self.assertEqual(preview.status_code, 200, preview.text)
+        self.assertIn("Row 3", preview.text)
+        self.assertIn("selected doctor does not exist", preview.text)
+        with TestingSessionLocal() as db:
+            batch = db.query(TourPlanImport).order_by(TourPlanImport.created_at.desc()).first()
+            batch_id = batch.id
+        confirm = client.post(f"/tour-plan/import/{batch_id}/confirm", follow_redirects=False)
+        self.assertEqual(confirm.status_code, 303, confirm.text)
+        with TestingSessionLocal() as db:
+            imported_plan = db.query(TourPlan).filter(TourPlan.title == "CSV imported plan").first()
+            self.assertIsNotNone(imported_plan)
+            self.assertEqual(imported_plan.audits[0].action, "imported")
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append([
+            "planned_date", "sequence", "doctor_id", "visit_type_id",
+            "planned_products", "planned_indication", "notes",
+        ])
+        sheet.append([today.isoformat(), 1, doctor.id, visit_type_id, "StemPro-X", "Ortho", "XLSX visit"])
+        file_buffer = io.BytesIO()
+        workbook.save(file_buffer)
+        xlsx_form = {**form, "title": "XLSX imported plan"}
+        xlsx_preview = client.post(
+            "/tour-plan/import/preview",
+            data=xlsx_form,
+            files={"upload": ("tour-plan.xlsx", file_buffer.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+        self.assertEqual(xlsx_preview.status_code, 200, xlsx_preview.text)
+        self.assertIn("StemPro-X", xlsx_preview.text)
+        malformed = client.post(
+            "/tour-plan/import/preview",
+            data=xlsx_form,
+            files={"upload": ("broken.xlsx", b"not a workbook", "application/octet-stream")},
+        )
+        self.assertEqual(malformed.status_code, 400)
+        self.assertIn("Could not read", malformed.text)
+
+    def test_17_admin_can_publish_assigned_draft_and_marketer_can_start_its_dcr(self):
+        client.cookies.clear()
+        with TestingSessionLocal() as db:
+            marketer = db.query(User).filter(User.username == "marketer1").first()
+            doctor = db.query(Doctor).filter(
+                Doctor.territory_id == marketer.territory_id
+            ).first()
+            visit_type = db.query(VisitType).filter(VisitType.is_active.is_(True)).first()
+            marketer_id = marketer.id
+            territory_id = marketer.territory_id
+            doctor_id = doctor.id
+            visit_type_id = visit_type.id
+        today = date.today()
+        period_start = today - timedelta(days=today.weekday())
+        admin_login = client.post(
+            "/auth/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        self.assertEqual(admin_login.status_code, 302)
+        created = client.post(
+            "/tour-plan",
+            data={
+                "title": "Admin Draft Publish Test",
+                "period_type": "weekly",
+                "period_start": period_start.isoformat(),
+                "period_end": (period_start + timedelta(days=6)).isoformat(),
+                "territory_id": territory_id,
+                "marketer_id": marketer_id,
+                "visits_json": json.dumps([{
+                    "planned_date": today.isoformat(),
+                    "sequence": 1,
+                    "doctor_id": doctor_id,
+                    "visit_type_id": visit_type_id,
+                }]),
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(created.status_code, 303, created.text)
+        plan_id = int(created.headers["location"].rsplit("/", 1)[1])
+        draft_detail = client.get(f"/tour-plan/{plan_id}")
+        self.assertEqual(draft_detail.status_code, 200)
+        self.assertIn("Publish Draft for Marketer", draft_detail.text)
+        published = client.post(
+            f"/tour-plan/{plan_id}/publish",
+            follow_redirects=False,
+        )
+        self.assertEqual(published.status_code, 303, published.text)
+        with TestingSessionLocal() as db:
+            plan = db.query(TourPlan).filter(TourPlan.id == plan_id).first()
+            self.assertEqual(plan.status, "Published")
+            visit_id = plan.visits[0].id
+            self.assertEqual(plan.audits[-1].action, "publish")
+
+        client.get("/auth/logout")
+        client.post(
+            "/auth/login",
+            data={"username": "marketer1", "password": "marketer123"},
+            follow_redirects=False,
+        )
+        detail = client.get(f"/tour-plan/{plan_id}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertIn(f"/dcr/form?planned_visit_id={visit_id}", detail.text)
+        form = client.get(f"/dcr/form?planned_visit_id={visit_id}")
+        self.assertEqual(form.status_code, 200, form.text)
+        self.assertIn("Admin Draft Publish Test", form.text)
+        self.assertIn(f'value="{doctor_id}" selected', form.text)
 
 
 if __name__ == "__main__":

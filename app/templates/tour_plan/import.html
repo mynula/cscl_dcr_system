@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Import Tour Plan - CSCL DCR System{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-5">
+  <div><div class="text-xs text-slate-500 mb-1"><a href="/tour-plan">Tour Plans</a> / Import</div><h1 class="text-2xl font-bold text-slate-900">Import Tour Plan</h1><p class="mt-1 text-sm text-slate-500">Upload a CSV or Excel workbook. Review row-level validation before creating a saved plan.</p></div>
+  {% if error %}<div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{{ error }}</div>{% endif %}
+  <section class="rounded-2xl border border-blue-100 bg-blue-50 p-5 text-sm text-blue-900">
+    <h2 class="font-bold">Required file columns</h2>
+    <p class="mt-1">planned_date, sequence, doctor_id, visit_type_id, planned_products, planned_indication, notes</p>
+    <p class="mt-2 text-xs">Use doctor and call-type IDs from the existing master-data directory. Maximum file size: 2 MB; maximum 250 visit rows.</p>
+    <a href="/tour-plan/import/template.csv" class="mt-3 inline-flex font-semibold underline">Download sample CSV</a>
+  </section>
+  <form id="import-form" method="post" enctype="multipart/form-data" action="/tour-plan/import/preview" class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-4">
+    <div><label class="block text-sm font-semibold text-slate-700">Plan title<input name="title" required maxlength="150" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"></label></div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <label class="block text-sm font-semibold text-slate-700">Period<select name="period_type" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
+      <label class="block text-sm font-semibold text-slate-700">Territory<select name="territory_id" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">{% for territory in territories %}<option value="{{ territory.id }}" {% if selected_territory_id == territory.id %}selected{% endif %}>{{ territory.name }}</option>{% endfor %}</select></label>
+      <label class="block text-sm font-semibold text-slate-700">Start date<input name="period_start" type="date" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"></label>
+      <label class="block text-sm font-semibold text-slate-700">End date<input name="period_end" type="date" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"></label>
+      {% if user.role == 'admin' %}<label class="block text-sm font-semibold text-slate-700 sm:col-span-2">Assigned marketer<select name="marketer_id" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm">{% for marketer in marketers %}<option value="{{ marketer.id }}">{{ marketer.full_name }}</option>{% endfor %}</select></label>{% else %}<input type="hidden" name="marketer_id" value="{{ user.id }}">{% endif %}
+    </div>
+    <label class="block text-sm font-semibold text-slate-700">CSV or Excel file<input type="file" name="upload" accept=".csv,.xlsx" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2"></label>
+    <div class="flex justify-end gap-3"><a href="/tour-plan" class="px-4 py-2.5 text-sm font-semibold text-slate-600">Cancel</a><button class="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white">Preview and validate</button></div>
+    <p id="upload-progress" class="hidden text-sm text-brand-700" role="status">Uploading and validating… Please wait.</p>
+  </form>
+</div>
+<script>document.getElementById("import-form").addEventListener("submit", () => { document.getElementById("upload-progress").classList.remove("hidden"); });</script>
+{% endblock %}

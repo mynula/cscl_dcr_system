@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if plan else 'Create' }} Tour Plan - CSCL DCR System{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-5">
+  <div>
+    <div class="text-xs text-slate-500 mb-1"><a href="/tour-plan" class="hover:text-brand-600">Tour Plans</a> / {{ 'Edit' if plan else 'New plan' }}</div>
+    <h1 class="text-2xl font-bold text-slate-900">{{ 'Edit Tour Plan' if plan else 'Create Tour Plan' }}</h1>
+    <p class="text-sm text-slate-500 mt-1">Select doctors and call types from existing master data; product and indication fields align with DCR entries.</p>
+  </div>
+  {% if error %}<div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{{ error }}</div>{% endif %}
+  {% if weekly_template %}<div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">Weekly Territory Plan template loaded with Monday–Friday visit rows. Select a doctor and call type for each planned visit.</div>{% endif %}
+
+  <form id="tour-plan-form" method="post" action="{{ '/tour-plan/' ~ plan.id ~ '/edit' if plan else '/tour-plan' }}" class="space-y-5">
+    <section class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="md:col-span-2 lg:col-span-3">
+        <label for="title" class="block text-sm font-semibold text-slate-700">Plan title</label>
+        <input id="title" name="title" maxlength="150" required value="{{ form_values.title if form_values else (plan.title if plan else title|default('')) }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm">
+      </div>
+      <div>
+        <label for="period_type" class="block text-sm font-semibold text-slate-700">Plan frequency</label>
+        <select id="period_type" name="period_type" class="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm">
+          <option value="weekly" {% if (form_values and form_values.period_type == 'weekly') or (not form_values and period_type == 'weekly') %}selected{% endif %}>Weekly</option>
+          <option value="monthly" {% if (form_values and form_values.period_type == 'monthly') or (not form_values and period_type == 'monthly') %}selected{% endif %}>Monthly</option>
+        </select>
+      </div>
+      <div><label class="block text-sm font-semibold text-slate-700" for="period_start">Start date</label><input id="period_start" name="period_start" type="date" required value="{{ form_values.period_start if form_values else (plan.period_start if plan else period_start) }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm"></div>
+      <div><label class="block text-sm font-semibold text-slate-700" for="period_end">End date</label><input id="period_end" name="period_end" type="date" required value="{{ form_values.period_end if form_values else (plan.period_end if plan else period_end) }}" class="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm"></div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700" for="territory_id">Territory</label>
+        <select id="territory_id" name="territory_id" required class="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm">
+          {% for territory in territories %}<option value="{{ territory.id }}" data-territory="{{ territory.id }}" {% if selected_territory_id == territory.id %}selected{% endif %}>{{ territory.name }}</option>{% endfor %}
+        </select>
+      </div>
+      {% if user.role == 'admin' %}
+      <div class="md:col-span-2">
+        <label class="block text-sm font-semibold text-slate-700" for="marketer_id">Assigned marketer</label>
+        <select id="marketer_id" name="marketer_id" required class="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm">
+          {% for marketer in marketers %}<option value="{{ marketer.id }}" {% if (form_values and form_values.marketer_id == marketer.id) or (not form_values and plan and plan.marketer_id == marketer.id) or (not form_values and not plan and copy_from and copy_from.marketer_id == marketer.id) or (not form_values and not plan and not copy_from and loop.first) %}selected{% endif %}>{{ marketer.full_name }}{% if marketer.territory %} · {{ marketer.territory.name }}{% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      {% else %}<input type="hidden" name="marketer_id" value="{{ user.id }}">{% endif %}
+    </section>
+
+    <section class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div><h2 class="font-bold text-slate-900">Planned daily visits</h2><p class="text-xs text-slate-500 mt-1">A doctor and a sequence number can each appear only once per date.</p></div>
+        <button type="button" id="add-visit" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-50">Add visit</button>
+      </div>
+      <div id="visit-rows" class="p-5 space-y-4"></div>
+    </section>
+    <input type="hidden" id="visits_json" name="visits_json">
+    {% if copy_from %}<input type="hidden" name="copy_from_id" value="{{ copy_from.id }}">{% endif %}
+    <div class="flex justify-end gap-3">
+      <a href="/tour-plan" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</a>
+      <button type="submit" class="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">{{ 'Save plan as draft' if not plan else 'Save changes' }}</button>
+    </div>
+  </form>
+</div>
+
+<template id="visit-row-template">
+  <div class="visit-row rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+    <div class="flex items-center justify-between"><h3 class="visit-label text-sm font-bold text-slate-800">Visit</h3><button type="button" class="remove-visit text-xs font-semibold text-red-600 hover:underline">Remove</button></div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <label class="text-xs font-semibold text-slate-600">Planned date<input data-key="planned_date" type="date" required class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></label>
+      <label class="text-xs font-semibold text-slate-600">Sequence<input data-key="sequence" type="number" min="1" required class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></label>
+      <label class="text-xs font-semibold text-slate-600">Doctor / Customer<select data-key="doctor_id" required class="doctor-select mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option value="">Select doctor</option>{% for doctor in doctors %}<option value="{{ doctor.id }}" data-territory="{{ doctor.territory_id }}">{{ doctor.name }} · {{ doctor.specialty }}{% if doctor.hospital %} · {{ doctor.hospital.name }}{% endif %}</option>{% endfor %}</select></label>
+      <label class="text-xs font-semibold text-slate-600">Visit / Call type<select data-key="visit_type_id" required class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option value="">Select call type</option>{% for item in visit_types %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
+      <label class="text-xs font-semibold text-slate-600">Planned product / therapy<input data-key="planned_products" maxlength="500" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></label>
+      <label class="text-xs font-semibold text-slate-600">Primary indication<input data-key="planned_indication" maxlength="150" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></label>
+      <label class="text-xs font-semibold text-slate-600 sm:col-span-2">Discussion topic / planned follow-up<textarea data-key="notes" rows="2" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></textarea></label>
+    </div>
+    <p class="text-[11px] text-slate-500 doctor-meta"></p>
+  </div>
+</template>
+
+<script type="application/json" id="initial-rows">{{ rows|tojson }}</script>
+<script>
+(() => {
+  const container = document.getElementById("visit-rows");
+  const template = document.getElementById("visit-row-template");
+  const territory = document.getElementById("territory_id");
+  const start = document.getElementById("period_start");
+  const form = document.getElementById("tour-plan-form");
+  const rows = JSON.parse(document.getElementById("initial-rows").textContent);
+
+  function refreshDoctors() {
+    const selected = territory.value;
+    container.querySelectorAll(".doctor-select option[data-territory]").forEach(option => {
+      option.hidden = option.dataset.territory !== selected;
+      if (option.selected && option.hidden) option.closest("select").value = "";
+    });
+  }
+  function addRow(data = {}) {
+    const row = template.content.firstElementChild.cloneNode(true);
+    row.querySelectorAll("[data-key]").forEach(input => {
+      const key = input.dataset.key;
+      if (data[key] !== undefined && data[key] !== null) input.value = data[key];
+    });
+    row.querySelector(".remove-visit").addEventListener("click", () => row.remove());
+    row.querySelector(".doctor-select").addEventListener("change", event => {
+      const option = event.target.selectedOptions[0];
+      row.querySelector(".doctor-meta").textContent = option && option.dataset.territory
+        ? option.textContent.split(" · ").slice(1).join(" · ")
+        : "";
+    });
+    container.appendChild(row);
+    refreshDoctors();
+  }
+  rows.forEach(addRow);
+  if (!rows.length) addRow();
+  document.getElementById("add-visit").addEventListener("click", () => addRow({
+    planned_date: start.value,
+    sequence: container.querySelectorAll(".visit-row").length + 1,
+  }));
+  territory.addEventListener("change", refreshDoctors);
+  start.addEventListener("change", () => container.querySelectorAll(".visit-row").forEach((row, index) => {
+    const field = row.querySelector('[data-key="planned_date"]');
+    if (!field.value) field.value = start.value;
+  }));
+  form.addEventListener("submit", event => {
+    const visits = [...container.querySelectorAll(".visit-row")].map(row => {
+      const visit = {};
+      row.querySelectorAll("[data-key]").forEach(input => visit[input.dataset.key] = input.value);
+      return visit;
+    });
+    if (!visits.length) {
+      event.preventDefault();
+      alert("Add at least one planned visit.");
+      return;
+    }
+    document.getElementById("visits_json").value = JSON.stringify(visits);
+  });
+})();
+</script>
+{% endblock %}

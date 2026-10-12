@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Tour Plans - CSCL DCR System{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <div class="text-xs text-slate-500 mb-1"><a href="/dashboard" class="hover:text-brand-600">Home</a> / Field Operations</div>
+      <h1 class="text-2xl font-bold tracking-tight text-slate-900">Tour Plans</h1>
+      <p class="text-sm text-slate-500 mt-1">Plan doctor visits and track submitted DCRs against assigned routes.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="/tour-plan/report" class="px-3.5 py-2 rounded-xl text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50">Plan vs Actual</a>
+      {% if can_create %}
+      <a href="/tour-plan/import" class="px-3.5 py-2 rounded-xl text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50">Import CSV / Excel</a>
+      <a href="/tour-plan/new?template=weekly" class="px-3.5 py-2 rounded-xl text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700">New Weekly Plan</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if user.role == 'admin' %}
+  <section class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h2 class="font-bold text-slate-900">Marketer self-service</h2>
+      <p class="text-xs text-slate-500 mt-1">When enabled, marketers may draft, edit, and submit their own plans. Admin review remains required.</p>
+    </div>
+    <form method="post" action="/tour-plan/settings" class="flex items-center gap-3">
+      <input type="hidden" name="marketer_self_service" value="{{ 'false' if self_service else 'true' }}">
+      <span class="text-sm font-semibold {% if self_service %}text-emerald-700{% else %}text-slate-500{% endif %}">{{ 'Enabled' if self_service else 'Disabled' }}</span>
+      <button type="submit" class="px-3 py-2 rounded-lg text-sm font-semibold border border-slate-200 hover:bg-slate-50">{{ 'Disable' if self_service else 'Enable' }}</button>
+    </form>
+  </section>
+  {% elif user.role == 'marketer' and not self_service %}
+  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">You can view assigned Tour Plans. Ask an Admin to enable marketer self-service to create or edit plans.</div>
+  {% endif %}
+
+  {% if saved_templates %}
+  <section class="bg-white rounded-2xl border border-slate-200 p-4">
+    <h2 class="font-bold text-slate-900">Saved route templates</h2>
+    <div class="mt-3 flex flex-wrap gap-2">{% for template in saved_templates %}<a href="/tour-plan/new?template_id={{ template.id }}" class="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:border-brand-300"><span class="font-semibold">{{ template.name }}</span><span class="text-xs text-slate-500"> · {{ template.territory.name }} · {{ template.period_type }}</span></a>{% endfor %}</div>
+  </section>
+  {% endif %}
+
+  <form method="get" action="/tour-plan" class="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+    <input type="date" name="start_date" value="{{ start_date }}" aria-label="Start date" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+    <input type="date" name="end_date" value="{{ end_date }}" aria-label="End date" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+    {% if user.role != 'marketer' %}
+    <select name="marketer_id" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+      <option value="">All Marketers</option>
+      {% for marketer in marketers %}<option value="{{ marketer.id }}" {% if selected_marketer_id == marketer.id %}selected{% endif %}>{{ marketer.full_name }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    <select name="territory_id" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+      <option value="">All Territories</option>
+      {% for territory in territories %}<option value="{{ territory.id }}" {% if selected_territory_id == territory.id %}selected{% endif %}>{{ territory.name }}</option>{% endfor %}
+    </select>
+    <select name="plan_status" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+      <option value="">All Statuses</option>
+      {% for item in ['Draft','Submitted','Approved','Returned','Published'] %}<option {% if selected_status == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+    </select>
+    <div class="flex gap-2">
+      <button class="flex-1 rounded-lg bg-slate-900 text-white text-sm font-semibold px-3 py-2">Filter</button>
+      <a href="/tour-plan?view={{ view }}" class="rounded-lg border border-slate-200 text-sm px-3 py-2">Clear</a>
+    </div>
+    <input type="hidden" name="view" value="{{ view }}">
+  </form>
+
+  <div class="flex items-center gap-2">
+    <a href="/tour-plan?view=list" class="px-3 py-2 rounded-lg text-sm font-semibold {% if view == 'list' %}bg-brand-50 text-brand-700{% else %}text-slate-500 hover:bg-slate-100{% endif %}">List</a>
+    <a href="/tour-plan?view=calendar" class="px-3 py-2 rounded-lg text-sm font-semibold {% if view == 'calendar' %}bg-brand-50 text-brand-700{% else %}text-slate-500 hover:bg-slate-100{% endif %}">Calendar</a>
+  </div>
+
+  {% if view == 'list' %}
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-left text-sm">
+        <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+          <tr><th class="px-4 py-3">Plan</th><th class="px-4 py-3">Marketer / Territory</th><th class="px-4 py-3">Period</th><th class="px-4 py-3">Visits</th><th class="px-4 py-3">Completion</th><th class="px-4 py-3">Status</th><th class="px-4 py-3"></th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for plan in plans %}
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-4 font-semibold text-slate-900">{{ plan.title }}</td>
+            <td class="px-4 py-4"><div class="font-medium">{{ plan.marketer.full_name }}</div><div class="text-xs text-slate-500">{{ plan.territory.name }}</div></td>
+            <td class="px-4 py-4 whitespace-nowrap">{{ plan.period_start }} – {{ plan.period_end }}</td>
+            <td class="px-4 py-4">{{ plan.actual_summary.completed }} / {{ plan.actual_summary.planned }}<div class="text-xs text-slate-500">{{ plan.actual_summary.pending }} pending DCR · {{ plan.actual_summary.not_visited }} not visited</div></td>
+            <td class="px-4 py-4"><span class="font-bold">{{ plan.actual_summary.percentage }}%</span><div class="mt-1 h-1.5 w-24 bg-slate-100 rounded"><div class="h-1.5 bg-emerald-500 rounded" style="width:{{ plan.actual_summary.percentage }}%"></div></div></td>
+            <td class="px-4 py-4"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold">{{ plan.status }}</span></td>
+            <td class="px-4 py-4"><a href="/tour-plan/{{ plan.id }}" class="text-brand-700 font-semibold hover:underline">Open</a></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="py-14 text-center text-slate-500"><p class="font-semibold text-slate-800">No Tour Plans yet</p><p class="text-sm mt-1">Create a weekly plan, start from a saved route template, or import a CSV/Excel file.</p></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  {% set calendar_rows = [] %}
+  {% for plan in plans %}
+    {% for visit in plan.visits %}
+      {% if (not start_date or visit.planned_date|string >= start_date) and (not end_date or visit.planned_date|string <= end_date) %}
+        {% set _ = calendar_rows.append({'visit': visit, 'plan': plan}) %}
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+  {% if calendar_rows %}
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    {% for group in calendar_rows|groupby('visit.planned_date') %}
+    <section class="bg-white rounded-2xl border border-slate-200 p-4">
+      <h2 class="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-3">{{ group.grouper }}</h2>
+      <div class="space-y-3">
+        {% for entry in group.list %}
+        <a href="/tour-plan/{{ entry.plan.id }}" class="block border-l-2 border-brand-500 pl-3 hover:bg-slate-50">
+          <div class="text-xs text-slate-500">{{ entry.visit.sequence }} · {{ entry.plan.marketer.full_name }} · {{ entry.visit.visit_type.name }}</div>
+          <div class="font-semibold text-sm text-slate-900">{{ entry.visit.doctor.name }}</div>
+          <div class="text-xs text-slate-600">{{ entry.plan.title }} · {{ entry.visit.status }}</div>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="rounded-2xl bg-white border border-slate-200 p-12 text-center text-slate-500">No scheduled visits in this calendar range.</div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

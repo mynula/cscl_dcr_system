@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Tour Plan vs Actual Report{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div><div class="text-xs text-slate-500 mb-1"><a href="/tour-plan">Tour Plans</a> / Performance</div><h1 class="text-2xl font-bold text-slate-900">Plan vs Actual</h1><p class="text-sm text-slate-500 mt-1">Published planned routes compared with submitted DCR records. Actual DCR values are never overwritten.</p></div>
+  <form method="get" action="/tour-plan/report" class="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+    <input type="date" name="start_date" value="{{ start_date }}" class="rounded-lg border border-slate-300 px-3 py-2 text-sm" aria-label="Start date">
+    <input type="date" name="end_date" value="{{ end_date }}" class="rounded-lg border border-slate-300 px-3 py-2 text-sm" aria-label="End date">
+    {% if user.role != 'marketer' %}<select name="marketer_id" class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="">All Marketers</option>{% for marketer in marketers %}<option value="{{ marketer.id }}" {% if selected_marketer_id == marketer.id %}selected{% endif %}>{{ marketer.full_name }}</option>{% endfor %}</select>{% endif %}
+    <select name="territory_id" class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="">All Territories</option>{% for territory in territories %}<option value="{{ territory.id }}" {% if selected_territory_id == territory.id %}selected{% endif %}>{{ territory.name }}</option>{% endfor %}</select>
+    <button class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">Apply filters</button>
+  </form>
+  <section class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+    {% for label, value in [('Planned', planned_count), ('Completed', completed_count), ('Pending DCR', pending_count), ('Not visited', not_visited_count), ('Completion', completion_percentage ~ '%')] %}
+    <div class="rounded-2xl border border-slate-200 bg-white p-4"><div class="text-xs font-semibold text-slate-500">{{ label }}</div><div class="mt-1 text-2xl font-bold text-slate-900">{{ value }}</div></div>
+    {% endfor %}
+  </section>
+  <section class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+    <div class="p-5 border-b border-slate-200"><h2 class="font-bold text-slate-900">Published planned visits</h2></div>
+    <div class="overflow-x-auto"><table class="min-w-full text-left text-sm">
+      <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">Planned</th><th class="p-3">Marketer / Territory</th><th class="p-3">Doctor / Specialty</th><th class="p-3">Planned objective</th><th class="p-3">Actual DCR</th><th class="p-3">Result</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for row in rows %}
+        <tr class="align-top"><td class="p-3"><a href="/tour-plan/{{ row.plan_id }}" class="font-semibold text-brand-700 hover:underline">{{ row.planned_date }}</a><div class="text-xs text-slate-500">{{ row.plan_title }}</div></td>
+          <td class="p-3">{{ row.marketer_name }}<div class="text-xs text-slate-500">{{ row.territory_name }}</div></td>
+          <td class="p-3">{{ row.planned_doctor }}<div class="text-xs text-slate-500">{{ row.planned_specialty }} · {{ row.planned_hospital }}</div></td>
+          <td class="p-3">{{ row.planned_visit_type }}<div class="text-xs text-slate-500">{{ row.planned_products }} · {{ row.planned_indication }}</div></td>
+          <td class="p-3">{% if row.dcr_number %}<span class="font-semibold">{{ row.dcr_number }}</span><div class="text-xs text-slate-500">{{ row.visit.actual_dcr.doctor.name }} · {{ row.visit.actual_dcr.report_date }}</div>{% else %}—{% endif %}</td>
+          <td class="p-3"><span class="font-semibold {% if row.status == 'Completed' %}text-emerald-700{% elif row.status == 'Pending DCR' %}text-amber-700{% else %}text-slate-600{% endif %}">{{ row.status }}</span>{% if row.mismatches %}<div class="mt-1 text-xs text-amber-700">Differences: {{ row.mismatches|join(', ') }}</div>{% endif %}</td></tr>
+        {% else %}<tr><td colspan="6" class="p-10 text-center text-slate-500">No published planned visits match this report filter.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+  <section class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+    <div class="p-5 border-b border-slate-200"><h2 class="font-bold text-slate-900">Unplanned DCR calls</h2><p class="text-xs text-slate-500 mt-1">Submitted DCRs with no linked planned visit remain valid and are listed here.</p></div>
+    <div class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">DCR</th><th class="p-3">Date</th><th class="p-3">Marketer</th><th class="p-3">Territory</th><th class="p-3">Doctor</th><th class="p-3">Call type / product</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">{% for dcr in unplanned_dcrs %}<tr><td class="p-3 font-semibold text-brand-700">{{ dcr.dcr_number }}</td><td class="p-3">{{ dcr.report_date }}</td><td class="p-3">{{ dcr.user.full_name }}</td><td class="p-3">{{ dcr.territory.name }}</td><td class="p-3">{{ dcr.doctor.name }}</td><td class="p-3">{{ dcr.visit_type.name }} · {{ dcr.products_discussed or '—' }}</td></tr>{% else %}<tr><td colspan="6" class="p-8 text-center text-slate-500">No unplanned DCR calls in this date range.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+</div>
+{% endblock %}

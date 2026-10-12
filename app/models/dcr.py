@@ -51,6 +51,15 @@ class FactDCR(Base):
     hospital = relationship("Hospital", back_populates="dcrs")
     doctor = relationship("Doctor", back_populates="dcrs")
     visit_type = relationship("VisitType", back_populates="dcrs")
+    tour_plan_visit = relationship("TourPlanVisit", back_populates="actual_dcr", uselist=False)
+
+    @property
+    def planned_visit_id(self):
+        return self.tour_plan_visit.id if self.tour_plan_visit else None
+
+    @property
+    def tour_plan_title(self):
+        return self.tour_plan_visit.plan.title if self.tour_plan_visit else None
 
     def __repr__(self):
         return f"<FactDCR(dcr_number='{self.dcr_number}', date='{self.report_date}', doctor_id={self.doctor_id})>"

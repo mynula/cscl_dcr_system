@@ -11,7 +11,7 @@
           {{ message }}
         </h3>
         <p class="text-xs text-emerald-700 mt-1">
-          Call report has been committed to the database and linked to your daily activity roster.
+          Call report saved successfully.
         </p>
         
         <!-- Summary pill info -->
@@ -28,6 +28,15 @@
           <span class="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800">
             Date: {{ dcr.report_date }}
           </span>
+          {% if dcr.tour_plan_title %}
+          <span class="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800">
+            Tour Plan: {{ dcr.tour_plan_title }}
+          </span>
+          {% else %}
+          <span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700">
+            Unplanned call
+          </span>
+          {% endif %}
         </div>
       </div>
     </div>

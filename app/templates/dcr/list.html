@@ -93,6 +93,13 @@
             <tr class="hover:bg-slate-50/70 transition-colors">
               <td class="py-3.5 px-4 font-mono font-bold text-brand-700 whitespace-nowrap">
                 {{ d.dcr_number }}
+                <div class="mt-1 text-[10px] font-sans font-medium {% if d.planned_visit_id %}text-emerald-700{% else %}text-slate-400{% endif %}">
+                  {% if d.planned_visit_id %}
+                  <a href="/tour-plan/{{ d.tour_plan_id }}" class="hover:underline">Planned · {{ d.tour_plan_title }}</a>
+                  {% else %}
+                  Unplanned call
+                  {% endif %}
+                </div>
               </td>
               <td class="py-3.5 px-4 whitespace-nowrap font-medium text-slate-900">
                 {{ d.report_date }}

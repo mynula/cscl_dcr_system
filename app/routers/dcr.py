@@ -3,12 +3,13 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.user import User
 from app.models.master import Territory, Hospital, Doctor, VisitType
 from app.models.dcr import FactDCR
+from app.models.tour_plan import TourPlan, TourPlanVisit
 from app.schemas.dcr import DcrCreate, DcrResponse
 from app.services.auth_service import get_current_user
 from app.services.dcr_service import create_dcr, get_dcrs, format_dcr_for_display
@@ -21,6 +22,7 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/form", response_class=HTMLResponse)
 async def dcr_form_page(
     request: Request,
+    planned_visit_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -38,6 +40,40 @@ async def dcr_form_page(
         hospitals = db.query(Hospital).filter(Hospital.territory_id == user_territory_id).order_by(Hospital.name).all()
         doctors = db.query(Doctor).filter(Doctor.territory_id == user_territory_id).order_by(Doctor.name).all()
 
+    prefill_visit = None
+    if planned_visit_id is not None:
+        prefill_visit = (
+            db.query(TourPlanVisit)
+            .join(TourPlan)
+            .options(
+                joinedload(TourPlanVisit.plan),
+                joinedload(TourPlanVisit.doctor),
+                joinedload(TourPlanVisit.visit_type),
+            )
+            .filter(
+                TourPlanVisit.id == planned_visit_id,
+                TourPlan.marketer_id == current_user.id,
+                TourPlan.status == "Published",
+                TourPlanVisit.actual_dcr_id.is_(None),
+                TourPlanVisit.status.in_(["Planned", "Rescheduled"]),
+            )
+            .first()
+        )
+        if not prefill_visit:
+            raise HTTPException(status_code=404, detail="Published planned visit not found.")
+        if current_user.territory_id and current_user.territory_id != prefill_visit.plan.territory_id:
+            raise HTTPException(status_code=403, detail="Planned visit is outside your assigned territory.")
+        if prefill_visit.doctor.territory_id != prefill_visit.plan.territory_id:
+            raise HTTPException(status_code=409, detail="Planned doctor is no longer in the plan territory.")
+        if current_user.territory_id is None:
+            hospitals = db.query(Hospital).filter(
+                Hospital.territory_id == prefill_visit.plan.territory_id
+            ).order_by(Hospital.name).all()
+            doctors = db.query(Doctor).filter(
+                Doctor.territory_id == prefill_visit.plan.territory_id
+            ).order_by(Doctor.name).all()
+            user_territory_id = prefill_visit.plan.territory_id
+
     today_str = date.today().isoformat()
 
     return templates.TemplateResponse(
@@ -50,7 +86,8 @@ async def dcr_form_page(
             "hospitals": hospitals,
             "doctors": doctors,
             "user_territory_id": user_territory_id,
-            "today_date": today_str
+            "today_date": prefill_visit.planned_date.isoformat() if prefill_visit else today_str,
+            "prefill_visit": prefill_visit,
         }
     )
 
@@ -137,6 +174,7 @@ async def submit_dcr(
     commercial_concern: Optional[str] = Form(None),
     competitor_intelligence: Optional[str] = Form(None),
     next_action: Optional[str] = Form(None),
+    planned_visit_id: Optional[int] = Form(None),
     # Optional JSON payload
     payload: Optional[DcrCreate] = None
 ):
@@ -178,6 +216,7 @@ async def submit_dcr(
             commercial_issue = payload.commercial_concern
             competitor_info = payload.competitor_intelligence
             action = payload.next_action
+            selected_planned_visit_id = payload.planned_visit_id
         else:
             if not report_date or not territory_id or not doctor_id or not visit_type_id:
                 raise ValueError("Missing required fields: Date, Territory, Doctor, and Visit Type are mandatory.")
@@ -205,6 +244,43 @@ async def submit_dcr(
             commercial_issue = commercial_concern.strip() if commercial_concern else None
             competitor_info = competitor_intelligence.strip() if competitor_intelligence else None
             action = next_action.strip() if next_action else None
+            selected_planned_visit_id = planned_visit_id
+
+        planned_visit = None
+        if selected_planned_visit_id:
+            planned_visit = (
+                db.query(TourPlanVisit)
+                .join(TourPlan)
+                .filter(
+                    TourPlanVisit.id == selected_planned_visit_id,
+                    TourPlan.marketer_id == current_user.id,
+                    TourPlan.status == "Published",
+                    TourPlanVisit.actual_dcr_id.is_(None),
+                    TourPlanVisit.status.in_(["Planned", "Rescheduled"]),
+                    TourPlanVisit.doctor_id == d_id,
+                )
+                .first()
+            )
+            if not planned_visit:
+                raise ValueError("Selected planned visit is unavailable or does not match this doctor.")
+        else:
+            matches = (
+                db.query(TourPlanVisit)
+                .join(TourPlan)
+                .filter(
+                    TourPlan.marketer_id == current_user.id,
+                    TourPlan.status == "Published",
+                    TourPlanVisit.planned_date == parsed_date,
+                    TourPlanVisit.doctor_id == d_id,
+                    TourPlanVisit.actual_dcr_id.is_(None),
+                    TourPlanVisit.status.in_(["Planned", "Rescheduled"]),
+                )
+                .order_by(TourPlanVisit.id)
+                .limit(2)
+                .all()
+            )
+            if len(matches) == 1:
+                planned_visit = matches[0]
 
         dcr_create = DcrCreate(
             report_date=parsed_date,
@@ -230,10 +306,11 @@ async def submit_dcr(
             commercial_concern=commercial_issue,
             competitor_intelligence=competitor_info,
             next_action=action,
-            user_id=current_user.id
+            user_id=current_user.id,
+            planned_visit_id=planned_visit.id if planned_visit else None,
         )
 
-        dcr_record = create_dcr(db, dcr_create, current_user.id)
+        dcr_record = create_dcr(db, dcr_create, current_user.id, planned_visit)
 
         if is_htmx:
             formatted = format_dcr_for_display(dcr_record)

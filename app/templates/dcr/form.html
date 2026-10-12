@@ -34,6 +34,13 @@
 
   <!-- Inline HTMX Feedback Container for Success/Error -->
   <div id="form-feedback-container" class="mb-6 transition-all duration-300"></div>
+  {% if prefill_visit %}
+  <div class="mb-6 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
+    <div class="font-bold">Recording a Tour Plan visit</div>
+    <div class="mt-1">{{ prefill_visit.plan.title }} · {{ prefill_visit.planned_date }} · Visit {{ prefill_visit.sequence }} · {{ prefill_visit.doctor.name }}</div>
+    <div class="mt-1 text-xs text-indigo-700">Date, territory, doctor, call type, and plan linkage are prefilled. Confirm the details before submitting.</div>
+  </div>
+  {% endif %}
 
   <!-- Main DCR Form Card -->
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -85,7 +92,7 @@
           >
             <option value="">-- Select Assigned Territory --</option>
             {% for t in territories %}
-            <option value="{{ t.id }}" {% if user_territory_id == t.id %}selected{% endif %}>
+            <option value="{{ t.id }}" {% if (prefill_visit and prefill_visit.plan.territory_id == t.id) or (not prefill_visit and user_territory_id == t.id) %}selected{% endif %}>
               [{{ t.code }}] {{ t.name }} ({{ t.region }})
             </option>
             {% endfor %}
@@ -109,7 +116,7 @@
           >
             <option value="">-- Select Hospital (Optional) --</option>
             {% for h in hospitals %}
-            <option value="{{ h.id }}">{{ h.name }} ({{ h.type }})</option>
+            <option value="{{ h.id }}" {% if prefill_visit and prefill_visit.doctor.hospital_id == h.id %}selected{% endif %}>{{ h.name }} ({{ h.type }})</option>
             {% endfor %}
           </select>
         </div>
@@ -135,13 +142,33 @@
             {% if doctors %}
               <option value="">-- Select Doctor --</option>
               {% for d in doctors %}
-              <option value="{{ d.id }}">{{ d.name }} - {{ d.specialty }}</option>
+              <option value="{{ d.id }}" {% if prefill_visit and prefill_visit.doctor_id == d.id %}selected{% endif %}>{{ d.name }} - {{ d.specialty }}</option>
               {% endfor %}
             {% else %}
               <option value="">-- Select Territory to Load Doctors --</option>
             {% endif %}
           </select>
         </div>
+      </div>
+
+      <div class="rounded-xl bg-indigo-50 border border-indigo-100 p-4">
+        <label for="planned_visit_id" class="block text-sm font-semibold text-indigo-900">Tour Plan Visit (Optional)</label>
+        <p class="text-xs text-indigo-700 mt-1">Matching published visits are suggested automatically. Leave unselected for an unplanned call; DCR submission is never blocked.</p>
+        <div
+          id="planned-visit-options"
+          hx-get="/tour-plan/visits/options"
+          hx-trigger="change from:#report_date, change from:#doctor_id"
+          hx-include="#report_date, #doctor_id"
+          hx-target="#planned_visit_id"
+          hx-swap="innerHTML"
+          class="hidden"
+        ></div>
+        <select id="planned_visit_id" name="planned_visit_id" class="mt-2 block w-full rounded-xl border border-indigo-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-brand-500">
+          <option value="">Unplanned call / auto-match if unique</option>
+          {% if prefill_visit %}
+          <option value="{{ prefill_visit.id }}" selected>{{ prefill_visit.sequence }}. {{ prefill_visit.doctor.name }} - {{ prefill_visit.visit_type.name }} ({{ prefill_visit.plan.title }})</option>
+          {% endif %}
+        </select>
       </div>
 
       <!-- Row 3: Visit Type & Next Follow-up -->
@@ -158,7 +185,7 @@
           >
             <option value="">-- Select Call Type --</option>
             {% for v in visit_types %}
-            <option value="{{ v.id }}">{{ v.name }}</option>
+            <option value="{{ v.id }}" {% if prefill_visit and prefill_visit.visit_type_id == v.id %}selected{% endif %}>{{ v.name }}</option>
             {% endfor %}
           </select>
         </div>

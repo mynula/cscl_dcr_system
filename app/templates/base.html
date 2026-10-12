@@ -65,6 +65,9 @@
             <a href="/dcr/list" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors {% if request.url.path == '/dcr/list' %}bg-brand-50 text-brand-700 font-semibold{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
               Call Reports
             </a>
+            <a href="/tour-plan" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors {% if '/tour-plan' in request.url.path %}bg-brand-50 text-brand-700 font-semibold{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
+              Tour Plan
+            </a>
             {% if user.role in ['admin', 'manager'] %}
             <a href="/admin" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors {% if '/admin' in request.url.path %}bg-brand-50 text-brand-700 font-semibold{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
               Master Admin

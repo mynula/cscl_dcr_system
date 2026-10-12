@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Review Tour Plan Import{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-5">
+  <div><div class="text-xs text-slate-500 mb-1"><a href="/tour-plan">Tour Plans</a> / Import review</div><h1 class="text-2xl font-bold text-slate-900">Review import: {{ title }}</h1><p class="text-sm text-slate-500 mt-1">{{ valid_rows|length }} valid visits; {{ errors|length }} row errors. Only valid rows will be saved.</p></div>
+  {% if errors %}
+  <section class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+    <h2 class="font-bold text-amber-900">Rows needing correction</h2>
+    <ul class="mt-2 space-y-1 text-sm text-amber-800">{% for error in errors %}<li>Row {{ error.row_number }}: {{ error.message }}</li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+  <section class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+    <div class="overflow-x-auto"><table class="min-w-full text-left text-sm">
+      <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">Row</th><th class="p-3">Date</th><th class="p-3">Sequence</th><th class="p-3">Doctor ID</th><th class="p-3">Call type ID</th><th class="p-3">Product / indication</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">{% for row in valid_rows %}<tr><td class="p-3">{{ row.row_number }}</td><td class="p-3">{{ row.planned_date }}</td><td class="p-3">{{ row.sequence }}</td><td class="p-3">{{ row.doctor_id }}</td><td class="p-3">{{ row.visit_type_id }}</td><td class="p-3">{{ row.planned_products or '—' }} · {{ row.planned_indication or '—' }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  <div class="flex justify-end gap-3"><a href="/tour-plan/import" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">Cancel / upload corrected file</a><form method="post" action="/tour-plan/import/{{ batch_id }}/confirm"><button class="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-bold text-white" {% if not valid_rows %}disabled{% endif %}>Save {{ valid_rows|length }} valid visits as Draft</button></form></div>
+</div>
+{% endblock %}

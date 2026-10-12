@@ -5,6 +5,7 @@ from sqlalchemy import func
 from app.models.dcr import FactDCR
 from app.models.user import User
 from app.models.master import Territory, Hospital, Doctor, VisitType
+from app.models.tour_plan import TourPlanAudit, TourPlanVisit
 from app.schemas.dcr import DcrCreate, DcrResponse
 
 
@@ -26,7 +27,12 @@ def generate_dcr_number(db: Session, report_date: date) -> str:
     return dcr_number
 
 
-def create_dcr(db: Session, dcr_in: DcrCreate, user_id: int) -> FactDCR:
+def create_dcr(
+    db: Session,
+    dcr_in: DcrCreate,
+    user_id: int,
+    planned_visit: Optional[TourPlanVisit] = None,
+) -> FactDCR:
     """Create and persist a new FactDCR entry."""
     dcr_number = generate_dcr_number(db, dcr_in.report_date)
     
@@ -59,6 +65,18 @@ def create_dcr(db: Session, dcr_in: DcrCreate, user_id: int) -> FactDCR:
         status="Submitted"
     )
     db.add(db_dcr)
+    if planned_visit:
+        db.flush()
+        planned_visit.actual_dcr_id = db_dcr.id
+        planned_visit.status = "Completed"
+        db.add(
+            TourPlanAudit(
+                plan_id=planned_visit.plan_id,
+                actor_id=user_id,
+                action="visit_completed",
+                details=f"Visit {planned_visit.id} linked to DCR {db_dcr.dcr_number}",
+            )
+        )
     db.commit()
     db.refresh(db_dcr)
     return db_dcr
@@ -124,5 +142,8 @@ def format_dcr_for_display(dcr: FactDCR) -> dict:
         "commercial_concern": dcr.commercial_concern or "",
         "competitor_intelligence": dcr.competitor_intelligence or "",
         "next_action": dcr.next_action or "",
-        "status": dcr.status
+        "status": dcr.status,
+        "planned_visit_id": dcr.tour_plan_visit.id if dcr.tour_plan_visit else None,
+        "tour_plan_title": dcr.tour_plan_visit.plan.title if dcr.tour_plan_visit else None,
+        "tour_plan_id": dcr.tour_plan_visit.plan_id if dcr.tour_plan_visit else None,
     }

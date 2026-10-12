@@ -42,6 +42,7 @@ class DcrBase(BaseModel):
 
 class DcrCreate(DcrBase):
     user_id: Optional[int] = None  # Filled from authenticated session if not provided
+    planned_visit_id: Optional[int] = None
 
 
 class DcrUpdate(BaseModel):
@@ -87,5 +88,8 @@ class DcrResponse(DcrBase):
     doctor_name: Optional[str] = None
     doctor_specialty: Optional[str] = None
     visit_type_name: Optional[str] = None
+    planned_visit_id: Optional[int] = None
+    tour_plan_id: Optional[int] = None
+    tour_plan_title: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

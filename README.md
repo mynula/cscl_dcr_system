@@ -93,6 +93,23 @@ These are for local development only. Production startup skips development accou
 - HTMX inline deletion and modal creation without full page refreshes.
 - Admin-only account creation for Admin, Manager, and Marketer roles.
 
+### 5. Tour Plans (`/tour-plan`)
+- Admins create plans for an active marketer; marketers can create their own only after an Admin enables **Marketer self-service** in Tour Plan settings and assigns them a territory. Self-service is disabled by default. Managers can view plans and reports but cannot create or review them.
+- Plans support weekly or full-calendar-month periods, doctor/territory and call-type validation, manual entry, copying to the next period, reusable route templates, and CSV or `.xlsx` upload with a row-level preview before saving.
+- Workflow: marketers save a Draft, submit it for review, and an Admin approves then publishes it. Admin-created plans can be published directly by the Admin, or submitted through the review flow. Admins can return a submitted or approved plan with a reason; marketers can revise and resubmit returned plans.
+- A DCR can be explicitly linked to a published planned visit, or linked automatically when there is exactly one matching open visit for that marketer, doctor, and date. Ambiguous or unmatched calls remain valid unplanned DCRs. Actual DCR values are retained and differences from planned date, doctor, call type, territory, product, or indication are flagged in the plan/report.
+- Plans include an audit trail, visit status, list/calendar views, and a plan-versus-actual report. Only submitted linked DCRs count as completed visits.
+- From a published plan, the assigned marketer can select **Record DCR for this visit** to open a prefilled call report with the planned date, territory, doctor, call type, and visit link.
+
+#### Tour Plan import columns
+CSV and Excel workbooks use one header row with these columns:
+
+```text
+planned_date,sequence,doctor_id,visit_type_id,planned_products,planned_indication,notes
+```
+
+`planned_date` uses `YYYY-MM-DD`; `doctor_id` and `visit_type_id` must match existing master-data IDs in the selected territory. Each file can contain at most 250 visits and must be no larger than 2 MB. The preview shows valid rows and row-specific errors; only valid rows are saved after confirmation.
+
 ## Deploying to Vercel with Neon
 
 Vercel detects the FastAPI entrypoint at `app/main.py`. `.python-version` selects Python 3.14, and `.gitignore`/`.vercelignore` keep local credentials, databases, and virtual environments out of deployments.
