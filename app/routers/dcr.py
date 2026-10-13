@@ -30,15 +30,21 @@ async def dcr_form_page(
     # Pre-select territory if user is assigned to one
     user_territory_id = current_user.territory_id
     
-    territories = db.query(Territory).order_by(Territory.name).all()
+    territories = db.query(Territory).filter(Territory.is_active.is_(True)).order_by(Territory.name).all()
     visit_types = db.query(VisitType).filter(VisitType.is_active == True).order_by(VisitType.name).all()
 
     # Pre-fetch hospitals and doctors if user has an assigned territory
     hospitals = []
     doctors = []
     if user_territory_id:
-        hospitals = db.query(Hospital).filter(Hospital.territory_id == user_territory_id).order_by(Hospital.name).all()
-        doctors = db.query(Doctor).filter(Doctor.territory_id == user_territory_id).order_by(Doctor.name).all()
+        hospitals = db.query(Hospital).filter(
+            Hospital.territory_id == user_territory_id,
+            Hospital.is_active.is_(True),
+        ).order_by(Hospital.name).all()
+        doctors = db.query(Doctor).filter(
+            Doctor.territory_id == user_territory_id,
+            Doctor.is_active.is_(True),
+        ).order_by(Doctor.name).all()
 
     prefill_visit = None
     if planned_visit_id is not None:
@@ -67,12 +73,25 @@ async def dcr_form_page(
             raise HTTPException(status_code=409, detail="Planned doctor is no longer in the plan territory.")
         if current_user.territory_id is None:
             hospitals = db.query(Hospital).filter(
-                Hospital.territory_id == prefill_visit.plan.territory_id
+                Hospital.territory_id == prefill_visit.plan.territory_id,
+                Hospital.is_active.is_(True),
             ).order_by(Hospital.name).all()
             doctors = db.query(Doctor).filter(
-                Doctor.territory_id == prefill_visit.plan.territory_id
+                Doctor.territory_id == prefill_visit.plan.territory_id,
+                Doctor.is_active.is_(True),
             ).order_by(Doctor.name).all()
             user_territory_id = prefill_visit.plan.territory_id
+        if not any(item.id == prefill_visit.plan.territory_id for item in territories):
+            territories.append(prefill_visit.plan.territory)
+        if (
+            prefill_visit.doctor.hospital
+            and not any(item.id == prefill_visit.doctor.hospital_id for item in hospitals)
+        ):
+            hospitals.append(prefill_visit.doctor.hospital)
+        if not any(item.id == prefill_visit.doctor_id for item in doctors):
+            doctors.append(prefill_visit.doctor)
+        if not any(item.id == prefill_visit.visit_type_id for item in visit_types):
+            visit_types.append(prefill_visit.visit_type)
 
     today_str = date.today().isoformat()
 
@@ -104,7 +123,10 @@ async def get_cascading_hospitals(
     if not territory_id:
         return "<option value=''>-- Select Hospital (Optional) --</option>"
     
-    hospitals = db.query(Hospital).filter(Hospital.territory_id == territory_id).order_by(Hospital.name).all()
+    hospitals = db.query(Hospital).filter(
+        Hospital.territory_id == territory_id,
+        Hospital.is_active.is_(True),
+    ).order_by(Hospital.name).all()
     
     options = ["<option value=''>-- Select Hospital (Optional) --</option>"]
     for h in hospitals:
@@ -126,7 +148,10 @@ async def get_cascading_doctors(
     if not territory_id:
         return "<option value=''>-- First Select a Territory --</option>"
     
-    query = db.query(Doctor).filter(Doctor.territory_id == territory_id)
+    query = db.query(Doctor).filter(
+        Doctor.territory_id == territory_id,
+        Doctor.is_active.is_(True),
+    )
     if hospital_id and hospital_id > 0:
         query = query.filter(Doctor.hospital_id == hospital_id)
         
@@ -281,6 +306,28 @@ async def submit_dcr(
             )
             if len(matches) == 1:
                 planned_visit = matches[0]
+
+        if not planned_visit:
+            if not db.query(Territory.id).filter(
+                Territory.id == t_id,
+                Territory.is_active.is_(True),
+            ).first():
+                raise ValueError("Selected territory is inactive or unavailable.")
+            if not db.query(Doctor.id).filter(
+                Doctor.id == d_id,
+                Doctor.is_active.is_(True),
+            ).first():
+                raise ValueError("Selected doctor is inactive or unavailable.")
+            if not db.query(VisitType.id).filter(
+                VisitType.id == v_id,
+                VisitType.is_active.is_(True),
+            ).first():
+                raise ValueError("Selected call type is inactive or unavailable.")
+            if h_id and not db.query(Hospital.id).filter(
+                Hospital.id == h_id,
+                Hospital.is_active.is_(True),
+            ).first():
+                raise ValueError("Selected hospital is inactive or unavailable.")
 
         dcr_create = DcrCreate(
             report_date=parsed_date,

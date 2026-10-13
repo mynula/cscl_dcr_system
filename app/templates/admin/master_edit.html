@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ resource_label|default(tab|replace('_', ' ')|title) }} - Master Data{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-5">
+  <div>
+    <a href="/admin?tab={{ tab }}" class="text-xs font-semibold text-brand-700 hover:underline">← Back to {{ tab|replace('_', ' ')|title }}</a>
+    <h1 class="mt-2 text-2xl font-bold text-slate-900">Edit {{ tab|replace('_', ' ')|title }} record</h1>
+  </div>
+  {% if error %}<div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="/admin/{{ resource }}/{{ record.id }}/edit" class="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-2xl border border-slate-200 bg-white p-6">
+    {% if resource == 'territories' %}
+    <label class="text-sm font-semibold text-slate-700">Code *<input required name="code" maxlength="30" value="{{ record.code }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700">Name *<input required name="name" maxlength="100" value="{{ record.name }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700">Region *<input required name="region" maxlength="100" value="{{ record.region }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700 sm:col-span-2">Description<textarea name="description" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">{{ record.description or '' }}</textarea></label>
+    {% elif resource == 'hospitals' %}
+    <label class="text-sm font-semibold text-slate-700">Code *<input required name="code" maxlength="30" value="{{ record.code }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700">Facility name *<input required name="name" maxlength="150" value="{{ record.name }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700">Type<input name="type" maxlength="50" value="{{ record.type or '' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700">Territory *<select required name="territory_id" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">{% for item in territories %}<option value="{{ item.id }}" {% if record.territory_id == item.id %}selected{% endif %}>{{ item.code }} · {{ item.name }}{% if not item.is_active %} (Inactive){% endif %}</option>{% endfor %}</select></label>
+    <label class="text-sm font-semibold text-slate-700">Address<input name="address" maxlength="255" value="{{ record.address or '' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700">Phone<input name="phone" maxlength="30" value="{{ record.phone or '' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    {% elif resource == 'doctors' %}
+    <label class="text-sm font-semibold text-slate-700">Doctor name *<input required name="name" maxlength="150" value="{{ record.name }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700">Specialty *<input required name="specialty" maxlength="100" value="{{ record.specialty }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700">Qualification<input name="qualification" maxlength="100" value="{{ record.qualification or '' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700">Designation<input name="designation" maxlength="100" value="{{ record.designation or '' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700">Territory *<select required name="territory_id" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">{% for item in territories %}<option value="{{ item.id }}" {% if record.territory_id == item.id %}selected{% endif %}>{{ item.code }} · {{ item.name }}{% if not item.is_active %} (Inactive){% endif %}</option>{% endfor %}</select></label>
+    <label class="text-sm font-semibold text-slate-700">Hospital<select name="hospital_id" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Independent / none</option>{% for item in hospitals %}<option value="{{ item.id }}" {% if record.hospital_id == item.id %}selected{% endif %}>{{ item.code }} · {{ item.name }} ({{ item.territory.code }}){% if not item.is_active %} (Inactive){% endif %}</option>{% endfor %}</select></label>
+    <label class="text-sm font-semibold text-slate-700">Phone<input name="phone" maxlength="30" value="{{ record.phone or '' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700">Email<input type="email" name="email" maxlength="100" value="{{ record.email or '' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700 sm:col-span-2">Chamber address<input name="chamber_address" maxlength="255" value="{{ record.chamber_address or '' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    {% else %}
+    <label class="text-sm font-semibold text-slate-700">Visit type name *<input required name="name" maxlength="50" value="{{ record.name }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    <label class="text-sm font-semibold text-slate-700 sm:col-span-2">Description<input name="description" maxlength="255" value="{{ record.description or '' }}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+    {% endif %}
+    <label class="text-sm font-semibold text-slate-700">Status<select name="is_active" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="true" {% if record.is_active %}selected{% endif %}>Active</option><option value="false" {% if not record.is_active %}selected{% endif %}>Inactive</option></select></label>
+    <div class="sm:col-span-2 flex justify-end gap-3 border-t border-slate-100 pt-4">
+      <a href="/admin?tab={{ tab }}" class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Cancel</a>
+      <button class="rounded-lg bg-brand-600 px-5 py-2 text-sm font-bold text-white hover:bg-brand-700">Save changes</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

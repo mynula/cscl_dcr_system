@@ -90,8 +90,19 @@ These are for local development only. Production startup skips development accou
 
 ### 4. Master Data Admin CRUD (`app/templates/admin/index.html`)
 - Tabbed management console for Territories, Hospitals, Doctors & KOLs, and Visit Classifications.
-- HTMX inline deletion and modal creation without full page refreshes.
+- Create and edit all master-data records, activate/deactivate them without deleting historical references, or delete records when no dependent data prevents it.
+- Bulk-import each master-data type from CSV or `.xlsx`. Imports validate the entire upload and are atomic: no rows are saved if any row is invalid. Download a sample CSV from each tab's **Bulk import CSV / Excel** action.
+- Import territories first, hospitals second (using `territory_code`), then doctors (using `territory_code` and optional `hospital_code`). Visit types can be imported independently. Inactive records remain visible to Admins but are excluded from new DCR and Tour Plan selections.
 - Admin-only account creation for Admin, Manager, and Marketer roles.
+
+Master-data CSV column headers:
+
+```text
+territories: code,name,region,description,is_active
+hospitals: code,name,type,territory_code,address,phone,is_active
+doctors: name,specialty,territory_code,hospital_code,qualification,designation,phone,email,chamber_address,is_active
+visit-types: name,description,is_active
+```
 
 ### 5. Tour Plans (`/tour-plan`)
 - Admins create plans for an active marketer; marketers can create their own only after an Admin enables **Marketer self-service** in Tour Plan settings and assigns them a territory. Self-service is disabled by default. Managers can view plans and reports but cannot create or review them.

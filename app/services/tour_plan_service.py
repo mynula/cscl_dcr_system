@@ -122,6 +122,8 @@ def validate_plan_visits(
         doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
         if not doctor:
             raise TourPlanValidationError(f"Visit row {index}: selected doctor does not exist.")
+        if not doctor.is_active:
+            raise TourPlanValidationError(f"Visit row {index}: selected doctor is inactive.")
         if doctor.territory_id != territory_id:
             raise TourPlanValidationError(
                 f"Visit row {index}: selected doctor is not assigned to this plan territory."
@@ -170,8 +172,8 @@ def create_plan(
     if not marketer:
         raise TourPlanValidationError("Select an active marketer account.")
     territory = db.query(Territory).filter(Territory.id == territory_id).first()
-    if not territory:
-        raise TourPlanValidationError("Select an existing territory.")
+    if not territory or not territory.is_active:
+        raise TourPlanValidationError("Select an active territory.")
     if marketer.territory_id and marketer.territory_id != territory_id:
         raise TourPlanValidationError("Selected territory does not match the marketer's assigned territory.")
     cleaned_visits = validate_plan_visits(
@@ -223,8 +225,9 @@ def update_plan(
         raise TourPlanValidationError("Select an active marketer account.")
     if marketer.territory_id and marketer.territory_id != territory_id:
         raise TourPlanValidationError("Selected territory does not match the marketer's assigned territory.")
-    if not db.query(Territory).filter(Territory.id == territory_id).first():
-        raise TourPlanValidationError("Select an existing territory.")
+    territory = db.query(Territory).filter(Territory.id == territory_id).first()
+    if not territory or not territory.is_active:
+        raise TourPlanValidationError("Select an active territory.")
     cleaned_visits = validate_plan_visits(
         db, territory_id, period_start, period_end, visits
     )

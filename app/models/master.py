@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, true
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -12,6 +12,7 @@ class Territory(Base):
     name = Column(String(100), nullable=False)
     region = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True, server_default=true(), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -33,6 +34,7 @@ class Hospital(Base):
     type = Column(String(50), default="General Hospital")  # Medical College, Diagnostic Center, Private Clinic
     address = Column(String(255), nullable=True)
     phone = Column(String(30), nullable=True)
+    is_active = Column(Boolean, default=True, server_default=true(), nullable=False)
     territory_id = Column(Integer, ForeignKey("territories.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -56,6 +58,7 @@ class Doctor(Base):
     phone = Column(String(30), nullable=True)
     email = Column(String(100), nullable=True)
     chamber_address = Column(String(255), nullable=True)
+    is_active = Column(Boolean, default=True, server_default=true(), nullable=False)
     territory_id = Column(Integer, ForeignKey("territories.id", ondelete="CASCADE"), nullable=False)
     hospital_id = Column(Integer, ForeignKey("hospitals.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

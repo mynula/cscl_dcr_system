@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Import {{ resource_label }} results - Master Data{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-5">
+  <a href="/admin?tab={{ resource|replace('-', '_') }}" class="text-xs font-semibold text-brand-700 hover:underline">← Back to Master Data</a>
+  {% if errors %}
+  <section class="rounded-2xl border border-red-200 bg-red-50 p-5">
+    <h1 class="text-xl font-bold text-red-900">Import not saved</h1>
+    <p class="mt-1 text-sm text-red-800">Fix the issues below and upload the complete file again. No rows were imported.</p>
+    <ul class="mt-4 list-inside list-disc space-y-1 text-sm text-red-800">{% for error in errors %}<li>{% if error.row_number %}Row {{ error.row_number }}: {% endif %}{{ error.message }}</li>{% endfor %}</ul>
+  </section>
+  {% else %}
+  <section class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+    <h1 class="text-xl font-bold text-emerald-900">Import complete</h1>
+    <p class="mt-1 text-sm text-emerald-800">{{ created_count }} {{ resource_label|lower }} record{% if created_count != 1 %}s{% endif %} imported successfully.</p>
+  </section>
+  {% endif %}
+  <div class="flex justify-end gap-3"><a href="/admin/import/{{ resource }}" class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold">Upload another file</a><a href="/admin?tab={{ resource|replace('-', '_') }}" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-bold text-white">View master data</a></div>
+</div>
+{% endblock %}

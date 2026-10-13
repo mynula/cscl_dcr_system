@@ -88,6 +88,31 @@ class TestCSCLDCRSystem(unittest.TestCase):
         self.assertTrue(expected_columns.issubset(actual_columns))
         legacy_engine.dispose()
 
+    def test_00_schema_migration_adds_master_active_columns(self):
+        legacy_engine = create_engine("sqlite:///:memory:")
+        with legacy_engine.begin() as connection:
+            connection.execute(text(
+                "CREATE TABLE territories (id INTEGER PRIMARY KEY, code VARCHAR(30) NOT NULL, "
+                "name VARCHAR(100) NOT NULL, region VARCHAR(100) NOT NULL, description TEXT, "
+                "created_at DATETIME)"
+            ))
+            connection.execute(text(
+                "CREATE TABLE hospitals (id INTEGER PRIMARY KEY, code VARCHAR(30) NOT NULL, "
+                "name VARCHAR(150) NOT NULL, type VARCHAR(50), address VARCHAR(255), "
+                "phone VARCHAR(30), territory_id INTEGER NOT NULL, created_at DATETIME)"
+            ))
+            connection.execute(text(
+                "CREATE TABLE doctors (id INTEGER PRIMARY KEY, name VARCHAR(150) NOT NULL, "
+                "qualification VARCHAR(100), specialty VARCHAR(100) NOT NULL, designation VARCHAR(100), "
+                "phone VARCHAR(30), email VARCHAR(100), chamber_address VARCHAR(255), "
+                "territory_id INTEGER NOT NULL, hospital_id INTEGER, created_at DATETIME)"
+            ))
+        for table in (Territory.__table__, Hospital.__table__, Doctor.__table__):
+            ensure_table_columns(table, legacy_engine)
+            names = {item["name"] for item in inspect(legacy_engine).get_columns(table.name)}
+            self.assertIn("is_active", names)
+        legacy_engine.dispose()
+
     @classmethod
     def setUpClass(cls):
         Base.metadata.create_all(bind=test_engine)
@@ -1023,6 +1048,7 @@ class TestCSCLDCRSystem(unittest.TestCase):
             territory_id = marketer.territory_id
             doctor_id = doctor.id
             visit_type_id = visit_type.id
+            hospital_id = doctor.hospital_id
         today = date.today()
         period_start = today - timedelta(days=today.weekday())
         admin_login = client.post(
@@ -1051,6 +1077,13 @@ class TestCSCLDCRSystem(unittest.TestCase):
         )
         self.assertEqual(created.status_code, 303, created.text)
         plan_id = int(created.headers["location"].rsplit("/", 1)[1])
+        with TestingSessionLocal() as db:
+            db.query(Territory).filter(Territory.id == territory_id).update({"is_active": False})
+            db.query(Doctor).filter(Doctor.id == doctor_id).update({"is_active": False})
+            db.query(VisitType).filter(VisitType.id == visit_type_id).update({"is_active": False})
+            if hospital_id:
+                db.query(Hospital).filter(Hospital.id == hospital_id).update({"is_active": False})
+            db.commit()
         draft_detail = client.get(f"/tour-plan/{plan_id}")
         self.assertEqual(draft_detail.status_code, 200)
         self.assertIn("Publish Draft for Marketer", draft_detail.text)
@@ -1078,6 +1111,228 @@ class TestCSCLDCRSystem(unittest.TestCase):
         self.assertEqual(form.status_code, 200, form.text)
         self.assertIn("Admin Draft Publish Test", form.text)
         self.assertIn(f'value="{doctor_id}" selected', form.text)
+        self.assertIn(f'value="{territory_id}" selected', form.text)
+        self.assertIn(f'value="{visit_type_id}" selected', form.text)
+        linked_dcr = client.post(
+            "/dcr/",
+            data={
+                "report_date": today.isoformat(),
+                "territory_id": territory_id,
+                "hospital_id": hospital_id or "",
+                "doctor_id": doctor_id,
+                "visit_type_id": visit_type_id,
+                "planned_visit_id": visit_id,
+            },
+            headers={"HX-Request": "true"},
+        )
+        self.assertEqual(linked_dcr.status_code, 200, linked_dcr.text)
+        self.assertIn("Admin Draft Publish Test", linked_dcr.text)
+
+    def test_18_master_data_edit_and_active_status_for_all_resource_types(self):
+        client.cookies.clear()
+        client.post(
+            "/auth/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        with TestingSessionLocal() as db:
+            territory = Territory(
+                code="EDIT-TERR-01", name="Editable Territory", region="Edit Region"
+            )
+            db.add(territory)
+            db.flush()
+            hospital = Hospital(
+                code="EDIT-HOSP-01", name="Editable Hospital", type="Clinic",
+                territory_id=territory.id,
+            )
+            db.add(hospital)
+            db.flush()
+            doctor = Doctor(
+                name="Editable Doctor", specialty="Hematology", territory_id=territory.id,
+                hospital_id=hospital.id,
+            )
+            visit_type = VisitType(name="Editable Visit Type", description="Before")
+            db.add_all([doctor, visit_type])
+            db.commit()
+            ids = {
+                "territories": territory.id,
+                "hospitals": hospital.id,
+                "doctors": doctor.id,
+                "visit-types": visit_type.id,
+            }
+            territory_id = territory.id
+            hospital_id = hospital.id
+            doctor_id = doctor.id
+            visit_type_id = visit_type.id
+
+        for resource, record_id in ids.items():
+            edit_page = client.get(f"/admin/{resource}/{record_id}/edit")
+            self.assertEqual(edit_page.status_code, 200, edit_page.text)
+            self.assertIn('name="is_active"', edit_page.text)
+
+        responses = [
+            client.post(f"/admin/territories/{territory_id}/edit", data={
+                "code": "EDIT-TERR-02", "name": "Edited Territory", "region": "Edited Region",
+                "description": "Updated", "is_active": "true",
+            }, follow_redirects=False),
+            client.post(f"/admin/hospitals/{hospital_id}/edit", data={
+                "code": "EDIT-HOSP-02", "name": "Edited Hospital", "type": "Clinic",
+                "territory_id": territory_id, "address": "New address", "phone": "123",
+                "is_active": "true",
+            }, follow_redirects=False),
+            client.post(f"/admin/doctors/{doctor_id}/edit", data={
+                "name": "Edited Doctor", "specialty": "Cardiology", "qualification": "MBBS",
+                "designation": "Consultant", "territory_id": territory_id,
+                "hospital_id": hospital_id, "phone": "456", "email": "edit@example.test",
+                "chamber_address": "New chamber", "is_active": "true",
+            }, follow_redirects=False),
+            client.post(f"/admin/visit-types/{visit_type_id}/edit", data={
+                "name": "Edited Visit Type", "description": "Updated description",
+                "is_active": "true",
+            }, follow_redirects=False),
+        ]
+        self.assertTrue(all(response.status_code == 303 for response in responses))
+
+        for resource, record_id in ids.items():
+            response = client.post(
+                f"/admin/{resource}/{record_id}/active",
+                data={"is_active": "false"},
+                headers={"HX-Request": "true"},
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("Inactive", response.text)
+            with TestingSessionLocal() as db:
+                model = {
+                    "territories": Territory,
+                    "hospitals": Hospital,
+                    "doctors": Doctor,
+                    "visit-types": VisitType,
+                }[resource]
+                self.assertFalse(db.query(model).filter(model.id == record_id).one().is_active)
+            invalid_dcr = client.post(
+                "/dcr/",
+                data={
+                    "report_date": date.today().isoformat(),
+                    "territory_id": territory_id,
+                    "hospital_id": hospital_id,
+                    "doctor_id": doctor_id,
+                    "visit_type_id": visit_type_id,
+                },
+                headers={"HX-Request": "true"},
+            )
+            self.assertEqual(invalid_dcr.status_code, 400)
+            self.assertIn("inactive or unavailable", invalid_dcr.text)
+            reactivated = client.post(
+                f"/admin/{resource}/{record_id}/active",
+                data={"is_active": "true"},
+                follow_redirects=False,
+            )
+            self.assertEqual(reactivated.status_code, 303)
+
+        with TestingSessionLocal() as db:
+            self.assertEqual(db.query(Territory).filter(Territory.id == territory_id).one().name, "Edited Territory")
+            self.assertEqual(db.query(Hospital).filter(Hospital.id == hospital_id).one().address, "New address")
+            self.assertEqual(db.query(Doctor).filter(Doctor.id == doctor_id).one().specialty, "Cardiology")
+            self.assertEqual(db.query(VisitType).filter(VisitType.id == visit_type_id).one().name, "Edited Visit Type")
+
+    def test_19_master_data_csv_and_xlsx_bulk_imports_are_atomic(self):
+        client.cookies.clear()
+        client.post(
+            "/auth/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+
+        def csv_file(text):
+            return {"upload": ("bulk.csv", text.encode("utf-8"), "text/csv")}
+
+        territory_csv = (
+            "code,name,region,description,is_active\n"
+            "BULK-TERR-01,Bulk Territory,Bulk Region,CSV imported,true\n"
+        )
+        territory_import = client.post(
+            "/admin/import/territories",
+            files=csv_file(territory_csv),
+        )
+        self.assertEqual(territory_import.status_code, 200, territory_import.text)
+        self.assertIn("1 territories record imported successfully", territory_import.text)
+
+        hospital_csv = (
+            "code,name,type,territory_code,address,phone,is_active\n"
+            "BULK-HOSP-01,Bulk Hospital,Clinic,BULK-TERR-01,Address,123,true\n"
+        )
+        hospital_import = client.post(
+            "/admin/import/hospitals",
+            files=csv_file(hospital_csv),
+        )
+        self.assertEqual(hospital_import.status_code, 200, hospital_import.text)
+
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.append([
+            "name", "specialty", "territory_code", "hospital_code", "qualification",
+            "designation", "phone", "email", "chamber_address", "is_active",
+        ])
+        worksheet.append([
+            "Bulk Doctor", "Hematology", "BULK-TERR-01", "BULK-HOSP-01",
+            "MBBS", "Consultant", "456", "bulk@example.test", "Address", "yes",
+        ])
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        doctor_import = client.post(
+            "/admin/import/doctors",
+            files={"upload": ("bulk.xlsx", buffer.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+        self.assertEqual(doctor_import.status_code, 200, doctor_import.text)
+
+        visit_type_import = client.post(
+            "/admin/import/visit-types",
+            files=csv_file("name,description,is_active\nBulk Seminar,Imported type,false\n"),
+        )
+        self.assertEqual(visit_type_import.status_code, 200, visit_type_import.text)
+
+        invalid_batch = client.post(
+            "/admin/import/territories",
+            files=csv_file(
+                "code,name,region,description,is_active\n"
+                "BULK-TERR-02,Would Be Created,Region,,true\n"
+                "BULK-TERR-01,Duplicate Code,Region,,true\n"
+            ),
+        )
+        self.assertEqual(invalid_batch.status_code, 400)
+        self.assertIn("Import not saved", invalid_batch.text)
+        with TestingSessionLocal() as db:
+            self.assertIsNone(db.query(Territory).filter(Territory.code == "BULK-TERR-02").first())
+            self.assertTrue(db.query(Doctor).filter(Doctor.name == "Bulk Doctor").one().is_active)
+            self.assertFalse(db.query(VisitType).filter(VisitType.name == "Bulk Seminar").one().is_active)
+
+        for resource in ("territories", "hospitals", "doctors", "visit-types"):
+            template = client.get(f"/admin/import/{resource}/template.csv")
+            self.assertEqual(template.status_code, 200)
+            self.assertTrue(template.text.splitlines()[0])
+
+        with TestingSessionLocal() as db:
+            manager = User(
+                username="master_import_marketer",
+                email="master-import-marketer@example.test",
+                hashed_password=get_password_hash("master-import-password"),
+                full_name="Master Import Marketer",
+                role="marketer",
+                is_active=True,
+            )
+            db.add(manager)
+            db.commit()
+        client.get("/auth/logout")
+        client.post(
+            "/auth/login",
+            data={"username": "master_import_marketer", "password": "master-import-password"},
+            follow_redirects=False,
+        )
+        forbidden = client.post(
+            "/admin/import/territories",
+            files=csv_file(territory_csv),
+        )
+        self.assertEqual(forbidden.status_code, 403, forbidden.text)
 
 
 if __name__ == "__main__":

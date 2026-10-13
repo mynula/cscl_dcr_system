@@ -24,6 +24,7 @@ class TerritoryUpdate(BaseModel):
 
 class TerritoryResponse(TerritoryBase):
     id: int
+    is_active: bool = True
     created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -37,6 +38,7 @@ class HospitalBase(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     territory_id: int
+    is_active: bool = True
 
 
 class HospitalCreate(HospitalBase):
@@ -71,6 +73,7 @@ class DoctorBase(BaseModel):
     chamber_address: Optional[str] = None
     territory_id: int
     hospital_id: Optional[int] = None
+    is_active: bool = True
 
 
 class DoctorCreate(DoctorBase):

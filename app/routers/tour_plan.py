@@ -151,7 +151,9 @@ def _plan_form_context(
     form_values: dict | None = None,
 ):
     actor_marketer = user.role == "marketer"
-    allowed_territories = db.query(Territory).order_by(Territory.name).all()
+    allowed_territories = db.query(Territory).filter(
+        Territory.is_active.is_(True)
+    ).order_by(Territory.name).all()
     if actor_marketer and user.territory_id:
         allowed_territories = [
             territory for territory in allowed_territories
@@ -167,7 +169,7 @@ def _plan_form_context(
         copy_from.territory_id if copy_from else
         allowed_territories[0].id if actor_marketer and allowed_territories else None
     )
-    doctors = db.query(Doctor).order_by(Doctor.name).all()
+    doctors = db.query(Doctor).filter(Doctor.is_active.is_(True)).order_by(Doctor.name).all()
     visit_types = db.query(VisitType).filter(
         VisitType.is_active.is_(True)
     ).order_by(VisitType.name).all()

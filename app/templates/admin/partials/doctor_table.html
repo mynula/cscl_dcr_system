@@ -6,6 +6,7 @@
       <th class="py-3 px-4">Territory</th>
       <th class="py-3 px-4">Affiliated Hospital</th>
       <th class="py-3 px-4">Contact Info</th>
+      <th class="py-3 px-4">Status</th>
       <th class="py-3 px-4 text-right">Actions</th>
     </tr>
   </thead>
@@ -32,12 +33,18 @@
         <div>{{ d.phone or '-' }}</div>
         <div class="text-[10px] text-slate-400">{{ d.email or '' }}</div>
       </td>
+      <td class="py-3 px-4"><span class="rounded-full px-2 py-0.5 text-[10px] font-bold {% if d.is_active %}bg-emerald-100 text-emerald-800{% else %}bg-slate-200 text-slate-700{% endif %}">{{ 'Active' if d.is_active else 'Inactive' }}</span></td>
       <td class="py-3 px-4 text-right">
+        <a href="/admin/doctors/{{ d.id }}/edit" class="mr-2 text-brand-700 hover:underline font-semibold">Edit</a>
+        <form method="post" action="/admin/doctors/{{ d.id }}/active" hx-post="/admin/doctors/{{ d.id }}/active" hx-target="#doctor-table-container" hx-swap="innerHTML" class="inline">
+          <input type="hidden" name="is_active" value="{{ 'false' if d.is_active else 'true' }}">
+          <button class="mr-2 font-semibold {% if d.is_active %}text-amber-700{% else %}text-emerald-700{% endif %}">{{ 'Deactivate' if d.is_active else 'Activate' }}</button>
+        </form>
         <button 
           hx-delete="/admin/doctors/{{ d.id }}" 
           hx-confirm="Are you sure you want to delete doctor {{ d.name }}?"
-          hx-target="closest tr" 
-          hx-swap="outerHTML" 
+          hx-target="#doctor-table-container"
+          hx-swap="innerHTML"
           class="text-red-500 hover:text-red-700 font-semibold p-1 hover:bg-red-50 rounded"
         >
           Delete

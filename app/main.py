@@ -11,6 +11,7 @@ from app.database import engine, Base, ensure_table_columns, get_db
 import app.models  # Ensure all models are registered with Base.metadata
 from app.models.user import User
 from app.models.dcr import FactDCR
+from app.models.master import Territory, Hospital, Doctor
 from app.services.auth_service import get_current_user_optional
 from app.services.seed_data import seed_database_defaults
 
@@ -36,6 +37,8 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         logger.info("All database tables verified / generated.")
         ensure_table_columns(FactDCR.__table__)
+        for master_table in (Territory.__table__, Hospital.__table__, Doctor.__table__):
+            ensure_table_columns(master_table)
         
         if settings.APP_ENV.lower() != "production":
             with Session(engine) as session:

@@ -6,6 +6,7 @@
       <th class="py-3 px-4">Type</th>
       <th class="py-3 px-4">Territory</th>
       <th class="py-3 px-4">Address / Phone</th>
+      <th class="py-3 px-4">Status</th>
       <th class="py-3 px-4 text-right">Actions</th>
     </tr>
   </thead>
@@ -21,12 +22,18 @@
         </span>
       </td>
       <td class="py-3 px-4 text-slate-500">{{ h.address or '-' }}</td>
+      <td class="py-3 px-4"><span class="rounded-full px-2 py-0.5 text-[10px] font-bold {% if h.is_active %}bg-emerald-100 text-emerald-800{% else %}bg-slate-200 text-slate-700{% endif %}">{{ 'Active' if h.is_active else 'Inactive' }}</span></td>
       <td class="py-3 px-4 text-right">
+        <a href="/admin/hospitals/{{ h.id }}/edit" class="mr-2 text-brand-700 hover:underline font-semibold">Edit</a>
+        <form method="post" action="/admin/hospitals/{{ h.id }}/active" hx-post="/admin/hospitals/{{ h.id }}/active" hx-target="#hospital-table-container" hx-swap="innerHTML" class="inline">
+          <input type="hidden" name="is_active" value="{{ 'false' if h.is_active else 'true' }}">
+          <button class="mr-2 font-semibold {% if h.is_active %}text-amber-700{% else %}text-emerald-700{% endif %}">{{ 'Deactivate' if h.is_active else 'Activate' }}</button>
+        </form>
         <button 
           hx-delete="/admin/hospitals/{{ h.id }}" 
           hx-confirm="Are you sure you want to delete {{ h.name }}?"
-          hx-target="closest tr" 
-          hx-swap="outerHTML" 
+          hx-target="#hospital-table-container"
+          hx-swap="innerHTML"
           class="text-red-500 hover:text-red-700 font-semibold p-1 hover:bg-red-50 rounded"
         >
           Delete

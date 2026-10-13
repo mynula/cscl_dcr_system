@@ -87,7 +87,7 @@
       <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
           <h2 class="text-sm font-bold text-slate-900">Configured Territories</h2>
-          <span class="text-xs text-slate-400">Inline deletion enabled</span>
+          <a href="/admin/import/territories" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-brand-700 hover:bg-brand-50">Bulk import CSV / Excel</a>
         </div>
         <div id="territory-table-container" class="overflow-x-auto">
           {% include "admin/partials/territory_table.html" %}
@@ -132,7 +132,7 @@
             <label class="block text-xs font-semibold text-slate-700 mb-1">Assigned Territory *</label>
             <select name="territory_id" required class="block w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-800 outline-none focus:border-brand-500">
               <option value="">-- Select Territory --</option>
-              {% for t in territories %}
+              {% for t in territories if t.is_active %}
               <option value="{{ t.id }}">{{ t.name }} ({{ t.code }})</option>
               {% endfor %}
             </select>
@@ -160,6 +160,7 @@
         <div id="hospital-table-container" class="overflow-x-auto">
           {% include "admin/partials/hospital_table.html" %}
         </div>
+        <a href="/admin/import/hospitals" class="border-t border-slate-100 px-6 py-3 text-xs font-bold text-brand-700 hover:bg-brand-50">Bulk import hospitals from CSV / Excel</a>
       </div>
     </div>
   </div>
@@ -199,7 +200,7 @@
             <label class="block text-xs font-semibold text-slate-700 mb-1">Assigned Territory *</label>
             <select name="territory_id" required class="block w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-800 outline-none focus:border-brand-500">
               <option value="">-- Select Territory --</option>
-              {% for t in territories %}
+              {% for t in territories if t.is_active %}
               <option value="{{ t.id }}">{{ t.name }}</option>
               {% endfor %}
             </select>
@@ -208,7 +209,7 @@
             <label class="block text-xs font-semibold text-slate-700 mb-1">Hospital (Optional)</label>
             <select name="hospital_id" class="block w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-800 outline-none focus:border-brand-500">
               <option value="">-- Independent Chamber / None --</option>
-              {% for h in hospitals %}
+              {% for h in hospitals if h.is_active %}
               <option value="{{ h.id }}">{{ h.name }}</option>
               {% endfor %}
             </select>
@@ -232,6 +233,7 @@
         <div id="doctor-table-container" class="overflow-x-auto">
           {% include "admin/partials/doctor_table.html" %}
         </div>
+        <a href="/admin/import/doctors" class="border-t border-slate-100 px-6 py-3 text-xs font-bold text-brand-700 hover:bg-brand-50">Bulk import doctors from CSV / Excel</a>
       </div>
     </div>
   </div>
@@ -274,6 +276,7 @@
         <div id="visit-type-table-container" class="overflow-x-auto">
           {% include "admin/partials/visit_type_table.html" %}
         </div>
+        <a href="/admin/import/visit-types" class="border-t border-slate-100 px-6 py-3 text-xs font-bold text-brand-700 hover:bg-brand-50">Bulk import visit types from CSV / Excel</a>
       </div>
     </div>
   </div>
@@ -321,7 +324,7 @@
             <label class="block text-xs font-semibold text-slate-700 mb-1">Assigned Territory</label>
             <select name="territory_id" class="block w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-800 outline-none focus:border-brand-500">
               <option value="">No territory assigned</option>
-              {% for t in territories %}
+              {% for t in territories if t.is_active %}
               <option value="{{ t.id }}">{{ t.name }}</option>
               {% endfor %}
             </select>
@@ -376,5 +379,8 @@
       targetBtn.classList.remove('border-transparent', 'text-slate-500', 'hover:text-slate-700', 'hover:border-slate-300', 'font-medium');
     }
   }
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => switchTab({{ active_tab|tojson }}));
 </script>
 {% endblock %}
